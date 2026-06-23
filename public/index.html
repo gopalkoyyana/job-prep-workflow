@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Job Prep Intelligence</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+  :root {
+    --bg:#0a0d14;--surface:#111520;--surface2:#161b2c;--border:#1e2640;
+    --accent:#4f8ef7;--accent2:#7c5cfc;--green:#22c55e;--yellow:#f59e0b;
+    --red:#ef4444;--text:#e2e8f0;--muted:#64748b;--subtle:#94a3b8;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+  header{background:linear-gradient(135deg,#0d1224,#111a35);border-bottom:1px solid var(--border);padding:18px 28px;display:flex;align-items:center;gap:14px;}
+  .logo-icon{width:42px;height:42px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+  header h1{font-size:18px;font-weight:700;}
+  header p{font-size:11px;color:var(--muted);margin-top:2px;}
+  .badge{margin-left:auto;background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.25);color:var(--accent);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;}
+
+  .app{display:flex;min-height:calc(100vh - 73px);}
+
+  /* Sidebar */
+  .sidebar{width:320px;min-width:320px;background:var(--surface);border-right:1px solid var(--border);padding:22px 18px;display:flex;flex-direction:column;gap:18px;}
+  .section-label{font-size:10px;font-weight:700;letter-spacing:1.2px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;}
+  label{font-size:12px;color:var(--subtle);font-weight:500;}
+  input,textarea{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 13px;font-size:13px;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s;margin-top:6px;}
+  input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,142,247,.12);}
+  .input-group{display:flex;flex-direction:column;gap:10px;}
+  .note{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;}
+
+  /* Steps */
+  .steps{display:flex;flex-direction:column;gap:7px;}
+  .step{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:8px;font-size:12px;font-weight:500;border:1px solid transparent;transition:all .3s;color:var(--muted);}
+  .step.active{background:rgba(79,142,247,.1);border-color:rgba(79,142,247,.25);color:var(--accent);}
+  .step.done{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.2);color:var(--green);}
+  .step-num{width:22px;height:22px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;border:1px solid var(--border);}
+  .step.active .step-num{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .step.done   .step-num{background:var(--green);border-color:var(--green);color:#fff;}
+
+  /* Buttons */
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:none;width:100%;transition:all .2s;}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+  .btn-primary:hover{opacity:.9;transform:translateY(-1px);}
+  .btn-secondary{background:var(--surface2);border:1px solid var(--border);color:var(--subtle);}
+  .btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none!important;}
+
+  /* Main */
+  .main{flex:1;padding:26px 28px;overflow-y:auto;display:flex;flex-direction:column;gap:22px;}
+
+  /* Cards */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+  .card-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface2);}
+  .card-header h3{font-size:13px;font-weight:600;}
+  .card-body{padding:18px;}
+
+  /* Empty */
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;gap:12px;color:var(--muted);}
+  .empty-icon{font-size:48px;opacity:.4;}
+  .empty h3{font-size:16px;font-weight:600;color:var(--subtle);}
+  .empty p{font-size:13px;line-height:1.6;max-width:360px;}
+
+  /* Loading */
+  .loading{display:flex;align-items:center;gap:12px;padding:16px 0;font-size:13px;color:var(--accent);}
+  .spinner{width:18px;height:18px;border-radius:50%;border:2px solid rgba(79,142,247,.2);border-top-color:var(--accent);animation:spin .8s linear infinite;flex-shrink:0;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* Skill chips */
+  .skill-chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .skill-chip{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.25);color:var(--accent);}
+
+  /* YouTube */
+  .yt-grid{display:flex;flex-direction:column;gap:11px;}
+  .yt-card{display:flex;gap:13px;align-items:flex-start;padding:13px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);transition:border-color .2s;}
+  .yt-card:hover{border-color:rgba(79,142,247,.35);}
+  .yt-thumb{width:96px;height:58px;border-radius:7px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden;}
+  .yt-thumb img{width:100%;height:100%;object-fit:cover;}
+  .yt-info{flex:1;min-width:0;}
+  .yt-skill{font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--accent);text-transform:uppercase;}
+  .yt-title{font-size:13px;font-weight:600;margin:3px 0;line-height:1.4;}
+  .yt-meta{font-size:11px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;}
+  .yt-link{display:inline-flex;align-items:center;gap:5px;margin-top:6px;font-size:12px;font-weight:600;color:#ff4444;text-decoration:none;background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.25);padding:3px 10px;border-radius:6px;}
+  .yt-link:hover{background:rgba(255,68,68,.2);}
+
+  /* Plan */
+  .plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:780px){.plan-grid{grid-template-columns:1fr;}}
+  .day-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .day-h1{padding:11px 15px;font-size:12px;font-weight:700;background:rgba(79,142,247,.12);color:var(--accent);}
+  .day-h2{padding:11px 15px;font-size:12px;font-weight:700;background:rgba(124,92,252,.12);color:#a78bfa;}
+  .day-body{padding:13px 15px;display:flex;flex-direction:column;gap:9px;}
+  .time-block{display:flex;gap:10px;align-items:flex-start;}
+  .time-label{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:var(--muted);width:56px;flex-shrink:0;padding-top:2px;}
+  .time-title{font-size:12px;font-weight:600;margin-bottom:2px;}
+  .time-desc{font-size:11px;color:var(--muted);line-height:1.5;}
+  .divider{height:1px;background:var(--border);margin:4px 0;}
+  .tips-box{margin-top:14px;padding:13px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:10px;}
+
+  /* Status banners */
+  .banner{display:flex;align-items:center;gap:10px;padding:11px 15px;border-radius:9px;font-size:13px;font-weight:500;margin-bottom:14px;}
+  .banner-ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:var(--green);}
+  .banner-err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--red);}
+  .banner-info{background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.25);color:var(--accent);}
+  .banner-warn{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--yellow);}
+
+  /* Email */
+  .email-preview{background:#fff;color:#1a1a1a;border-radius:10px;padding:24px;max-height:400px;overflow-y:auto;font-size:13px;line-height:1.8;}
+  .email-actions{display:flex;gap:9px;margin-bottom:13px;flex-wrap:wrap;}
+  .act-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;text-decoration:none;transition:all .2s;}
+  .act-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+  .act-secondary{background:var(--surface2);border:1px solid var(--border);color:var(--subtle);}
+  .act-secondary:hover{border-color:var(--accent);color:var(--accent);}
+
+  .job-meta{display:flex;gap:14px;flex-wrap:wrap;margin:8px 0 12px;font-size:12px;color:var(--subtle);}
+  .job-detail{font-size:13px;line-height:1.8;color:var(--subtle);}
+  .job-detail h4{color:var(--text);font-size:14px;margin-bottom:4px;}
+
+  @media(max-width:800px){.app{flex-direction:column;}.sidebar{width:100%;min-width:unset;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-icon">🎯</div>
+  <div>
+    <h1>Job Prep Intelligence</h1>
+    <p>AI-powered · Secure Node.js backend · API key stays server-side</p>
+  </div>
+  <span class="badge" id="serverBadge">⟳ Connecting…</span>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+
+    <div>
+      <div class="section-label">Target Job</div>
+      <div class="input-group">
+        <label>Job Role / Position Title</label>
+        <input id="jobRole" type="text" placeholder="e.g. Senior React Native Developer"/>
+        <label>Country of Placement</label>
+        <input id="jobCountry" type="text" placeholder="e.g. United States, India, Remote" value="United States"/>
+        <label>Job Posting Recency (Duration)</label>
+        <select id="jobDuration" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 13px;font-size:13px;outline:none;margin-top:6px;">
+          <option value="last 24 hours">Last 24 Hours</option>
+          <option value="last 2 days">Last 2 Days</option>
+          <option value="last 7 days" selected>Last 7 Days</option>
+          <option value="last 14 days">Last 14 Days</option>
+          <option value="anytime">Anytime</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Your Details</div>
+      <div class="input-group">
+        <label>Your Name</label>
+        <input id="userName" type="text" placeholder="e.g. Gopal"/>
+        <label>Email Address</label>
+        <input id="userEmail" type="email" placeholder="your@email.com"/>
+        <p class="note">📧 Email will be sent automatically via your configured SMTP</p>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Workflow Progress</div>
+      <div class="steps">
+        <div class="step" id="step1"><div class="step-num">1</div>Fetch Job Posting</div>
+        <div class="step" id="step2"><div class="step-num">2</div>Extract Skills</div>
+        <div class="step" id="step3"><div class="step-num">3</div>Find YouTube Resources</div>
+        <div class="step" id="step4"><div class="step-num">4</div>Generate 2-Day Plan</div>
+        <div class="step" id="step5"><div class="step-num">5</div>Draft & Send Email</div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="runBtn" onclick="runWorkflow()">🚀 Run Full Workflow</button>
+    <button class="btn btn-secondary" onclick="resetAll()">↺ Reset</button>
+
+  </aside>
+
+  <main class="main" id="mainPanel">
+    <div class="empty" id="emptyState">
+      <div class="empty-icon">🔍</div>
+      <h3>Ready to launch your prep workflow</h3>
+      <p>Enter a job role and email. The Node.js server will handle all Claude API calls securely — your API key never touches the browser.</p>
+    </div>
+  </main>
+</div>
+
+<script>
+// ── Config: backend URL (same origin since Express serves this file) ──
+const API_BASE = '';   // empty = same host; set to 'http://localhost:3000' if running separately
+
+let state = { jobRole:'', userName:'', userEmail:'', jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
+
+// ── Health check on load ─────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API_BASE}/api/health`);
+    const d = await r.json();
+    if (d.status === 'ok') {
+      document.getElementById('serverBadge').textContent = '✅ Server Connected';
+      document.getElementById('serverBadge').style.background = 'rgba(34,197,94,0.12)';
+      document.getElementById('serverBadge').style.borderColor = 'rgba(34,197,94,0.3)';
+      document.getElementById('serverBadge').style.color = '#22c55e';
+    }
+  } catch {
+    document.getElementById('serverBadge').textContent = '❌ Server Offline';
+    document.getElementById('serverBadge').style.color = '#ef4444';
+  }
+}
+checkHealth();
+
+// ── Helpers ──────────────────────────────────────────────────────
+function setStep(n, status) {
+  const el = document.getElementById('step' + n);
+  el.className = 'step ' + status;
+  if (status === 'done') el.querySelector('.step-num').textContent = '✓';
+  if (status === 'active') el.querySelector('.step-num').textContent = n;
+}
+
+let state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobDuration:'', jobsList:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
+
+function resetAll() {
+  for (let i = 1; i <= 5; i++) {
+    const el = document.getElementById('step' + i);
+    el.className = 'step';
+    el.querySelector('.step-num').textContent = i;
+  }
+  document.getElementById('mainPanel').innerHTML = `
+    <div class="empty" id="emptyState">
+      <div class="empty-icon">🔍</div>
+      <h3>Ready to launch your prep workflow</h3>
+      <p>Enter a job role and email. The Node.js server handles all Claude/Gemini/OpenAI API calls securely.</p>
+    </div>`;
+  document.getElementById('runBtn').disabled = false;
+  state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobDuration:'', jobsList:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
+}
+
+function addCard(id, icon, title, bodyHTML) {
+  document.getElementById('emptyState')?.remove();
+  const main = document.getElementById('mainPanel');
+  document.getElementById(id)?.remove();
+  main.insertAdjacentHTML('beforeend', `
+    <div class="card" id="${id}">
+      <div class="card-header"><span>${icon}</span><h3>${title}</h3></div>
+      <div class="card-body">${bodyHTML}</div>
+    </div>`);
+  main.scrollTop = main.scrollHeight;
+}
+
+function setCardBody(id, html) {
+  const c = document.getElementById(id);
+  if (c) c.querySelector('.card-body').innerHTML = html;
+}
+
+async function apiPost(path, body) {
+  const r = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const d = await r.json();
+  if (!r.ok || d.error) throw new Error(d.error || `HTTP ${r.status}`);
+  return d.data;
+}
+
+// ── Step 1 ───────────────────────────────────────────────────────
+async function step1() {
+  setStep(1, 'active');
+  addCard('c1','🌐','Step 1 — Fetching Job Postings',
+    `<div class="loading"><div class="spinner"></div>Searching job portals for <strong>${state.jobRole}</strong>…</div>`);
+
+  const jobs = await apiPost('/api/job', { 
+    jobRole: state.jobRole,
+    country: state.jobCountry,
+    duration: state.jobDuration
+  });
+  state.jobsList = jobs;
+
+  if (!jobs || jobs.length === 0) {
+    setCardBody('c1', `<div class="banner banner-err">❌ No job postings found. Try adjusting role, country, or duration filters.</div>`);
+    document.getElementById('runBtn').disabled = false;
+    return;
+  }
+
+  let html = `<div class="banner banner-info">ℹ️ Found ${jobs.length} postings. Select one to proceed with your prep plan.</div>`;
+  html += `<div style="display:flex; flex-direction:column; gap:16px; margin-top:12px;">`;
+  
+  jobs.forEach((job) => {
+    const reqs = (job.requirements || []).map(r => `<li>${r}</li>`).join('');
+    html += `
+      <div class="job-detail" style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:16px; text-align:left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <h4 style="font-size:15px; color:var(--text); font-weight:700;">${job.title}</h4>
+          <span style="font-size:11px; font-weight:700; background:rgba(79, 142, 247, 0.15); color:var(--accent); padding:3px 8px; border-radius:12px;">${job.portal}</span>
+        </div>
+        <div class="job-meta" style="margin:8px 0; display:flex; gap:14px; font-size:12px; color:var(--subtle); flex-wrap:wrap;">
+          <span>🏢 <strong>${job.company}</strong></span>
+          <span>📍 ${job.location}</span>
+          <span>⏱ ${job.experience}</span>
+          <span>💰 ${job.salary}</span>
+        </div>
+        <div class="divider"></div>
+        <p style="margin-top:10px; font-size:13px; color:var(--subtle); line-height:1.6;">${job.description}</p>
+        <h4 style="margin-top:12px; font-size:13px; color:var(--text);">Key Requirements</h4>
+        <ul style="padding-left:18px; margin-top:6px; font-size:12px; color:var(--subtle);">${reqs}</ul>
+        <button class="btn btn-primary" style="margin-top:14px; width:auto; padding:8px 16px; font-size:12px;" onclick="selectJob(${job.id})">🎯 Select This Job</button>
+      </div>
+    `;
+  });
+  
+  html += `</div>`;
+  setCardBody('c1', html);
+}
+
+async function selectJob(jobId) {
+  const selected = state.jobsList.find(j => j.id === jobId);
+  if (!selected) return;
+  state.jobData = selected;
+  
+  const reqs = (selected.requirements || []).map(r => `<li>${r}</li>`).join('');
+  setCardBody('c1', `
+    <div class="banner banner-ok">✅ Selected: ${selected.title} at ${selected.company}</div>
+    <div class="job-detail">
+      <h4>${selected.title}</h4>
+      <div class="job-meta">
+        <span>🏢 ${selected.company}</span><span>📍 ${selected.location}</span>
+        <span>⏱ ${selected.experience}</span><span>💰 ${selected.salary}</span>
+      </div>
+      <div class="divider"></div>
+      <p style="margin-top:10px;">${selected.description}</p>
+      <h4 style="margin-top:12px;">Key Requirements</h4>
+      <ul style="padding-left:18px;margin-top:6px;">${reqs}</ul>
+    </div>`);
+  
+  setStep(1, 'done');
+  
+  try {
+    await step2();
+    await step3();
+    await step4();
+    await step5();
+    
+    const main = document.getElementById('mainPanel');
+    main.insertAdjacentHTML('beforeend', `
+      <div class="banner banner-ok" style="margin-top:4px;">
+        🎉 All done, ${state.userName||'champion'}! Your 2-day prep plan is ready. Good luck!
+      </div>`);
+    main.scrollTop = main.scrollHeight;
+  } catch (err) {
+    document.getElementById('mainPanel').insertAdjacentHTML('beforeend', `
+      <div class="banner banner-err">❌ ${err.message}</div>`);
+    document.getElementById('runBtn').disabled = false;
+  }
+}
+
+// ── Step 2 ───────────────────────────────────────────────────────
+async function step2() {
+  setStep(2, 'active');
+  addCard('c2','🧠','Step 2 — Extracting Skill Keywords',
+    `<div class="loading"><div class="spinner"></div>Analysing job description…</div>`);
+
+  state.skills = await apiPost('/api/skills', { jobData: state.jobData });
+
+  setCardBody('c2', `
+    <p style="font-size:13px;color:var(--subtle);margin-bottom:12px;">
+      Identified <strong style="color:var(--text)">${state.skills.length} key skills</strong>:
+    </p>
+    <div class="skill-chips">${state.skills.map(s=>`<span class="skill-chip">${s}</span>`).join('')}</div>`);
+  setStep(2, 'done');
+}
+
+// ── Step 3 ───────────────────────────────────────────────────────
+async function step3() {
+  setStep(3, 'active');
+  addCard('c3','▶️','Step 3 — YouTube Learning Resources (≤10 min each)',
+    `<div class="loading"><div class="spinner"></div>Curating tutorials for each skill…</div>`);
+
+  state.ytResources = await apiPost('/api/youtube', { skills: state.skills });
+
+  const cards = state.ytResources.map(r => `
+    <div class="yt-card">
+      <div class="yt-thumb">
+        ${r.videoId
+          ? `<img src="https://img.youtube.com/vi/${r.videoId}/mqdefault.jpg" onerror="this.parentNode.innerHTML='▶️'"/>`
+          : '▶️'}
+      </div>
+      <div class="yt-info">
+        <div class="yt-skill">${r.skill}</div>
+        <div class="yt-title">${r.title}</div>
+        <div class="yt-meta"><span>📺 ${r.channel}</span><span>⏱ ${r.duration}</span><span>👁 ${r.views}</span></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">${r.reason||''}</div>
+        <a class="yt-link" href="${r.url}" target="_blank">▶ Watch on YouTube</a>
+      </div>
+    </div>`).join('');
+
+  setCardBody('c3', `<div class="yt-grid">${cards}</div>`);
+  setStep(3, 'done');
+}
+
+// ── Step 4 ───────────────────────────────────────────────────────
+async function step4() {
+  setStep(4, 'active');
+  addCard('c4','📅','Step 4 — 2-Day Preparation Plan',
+    `<div class="loading"><div class="spinner"></div>Building your schedule…</div>`);
+
+  state.plan = await apiPost('/api/plan', { jobData: state.jobData, skills: state.skills, ytResources: state.ytResources });
+  const p = state.plan;
+
+  function blocks(list) {
+    return (list||[]).map((b,i) => {
+      const tags = (b.skills||[]).map(s=>`<span class="skill-chip" style="font-size:10px;padding:2px 8px;">${s}</span>`).join('');
+      let resourceHtml = '';
+      if (b.resource) {
+        resourceHtml = `<div style="margin-top:6px;"><a class="yt-link" href="${b.resource}" target="_blank" style="font-size:11px; padding:3px 8px; display:inline-flex;">▶ Watch Tutorial</a></div>`;
+      }
+      return `<div class="time-block">
+        <span class="time-label">${b.time}</span>
+        <div class="time-content">
+          <div class="time-title">${b.title}</div>
+          <div class="time-desc">${b.desc}</div>
+          ${tags?`<div style="margin-top:4px;">${tags}</div>`:''}
+          ${resourceHtml}
+        </div>
+      </div>${i<list.length-1?'<div class="divider"></div>':''}`;
+    }).join('');
+  }
+
+  const tips = (p.tips||[]).map(t=>`<div style="font-size:12px;color:var(--subtle);margin-bottom:5px;">• ${t}</div>`).join('');
+
+  setCardBody('c4', `
+    <div class="plan-grid">
+      <div class="day-card"><div class="day-h1">📘 Day 1 — ${p.day1.theme}</div><div class="day-body">${blocks(p.day1.blocks)}</div></div>
+      <div class="day-card"><div class="day-h2">📗 Day 2 — ${p.day2.theme}</div><div class="day-body">${blocks(p.day2.blocks)}</div></div>
+    </div>
+    ${tips?`<div class="tips-box"><div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:8px;">💡 PRO TIPS</div>${tips}</div>`:''}`);
+  setStep(4, 'done');
+}
+
+// ── Step 5 ───────────────────────────────────────────────────────
+async function step5() {
+  setStep(5, 'active');
+  addCard('c5','📧','Step 5 — Drafting & Sending Email',
+    `<div class="loading"><div class="spinner"></div>Generating personalised email…</div>`);
+
+  const result = await fetch(`${API_BASE}/api/email`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      userName: state.userName, userEmail: state.userEmail,
+      jobData: state.jobData, skills: state.skills,
+      ytResources: state.ytResources, plan: state.plan
+    })
+  }).then(r=>r.json());
+
+  if (result.error && !result.data) throw new Error(result.error);
+  state.emailDraft = result.data;
+
+  const sentBanner = result.emailSent
+    ? `<div class="banner banner-ok">✅ Email sent to ${state.userEmail}</div>`
+    : `<div class="banner banner-warn">⚠️ ${result.sendError || 'SMTP not configured — copy HTML to send manually'}</div>`;
+
+  const subj = (result.data?.subject||'').replace(/"/g,'&quot;');
+  setCardBody('c5', `
+    ${sentBanner}
+    <div style="display:flex;gap:10px;margin-bottom:13px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:180px;"><label>Subject</label><input type="text" value="${subj}" readonly/></div>
+      <div style="min-width:180px;"><label>To</label><input type="text" value="${state.userEmail}" readonly/></div>
+    </div>
+    <div class="email-actions">
+      <button class="act-btn act-primary" onclick="copyEmailHTML()">📋 Copy Email HTML</button>
+      <a class="act-btn act-secondary" href="mailto:${state.userEmail}?subject=${encodeURIComponent(result.data?.subject||'')}" target="_blank">📤 Open in Mail App</a>
+    </div>
+    <div class="email-preview">${result.data?.html||''}</div>`);
+  setStep(5, 'done');
+}
+
+function copyEmailHTML() {
+  const html = state.emailDraft?.html || '';
+  navigator.clipboard.writeText(html).then(() => {
+    const btn = event.target;
+    btn.textContent = '✅ Copied!';
+    setTimeout(()=>{ btn.textContent='📋 Copy Email HTML'; }, 2500);
+  });
+}
+
+// ── Orchestrator ─────────────────────────────────────────────────
+async function runWorkflow() {
+  state.jobRole   = document.getElementById('jobRole').value.trim();
+  state.userName  = document.getElementById('userName').value.trim();
+  state.userEmail = document.getElementById('userEmail').value.trim();
+  state.jobCountry = document.getElementById('jobCountry').value.trim();
+  state.jobDuration = document.getElementById('jobDuration').value;
+
+  if (!state.jobRole)   return alert('Please enter a job role.');
+  if (!state.userEmail) return alert('Please enter your email address.');
+
+  document.getElementById('runBtn').disabled = true;
+
+  try {
+    await step1();
+  } catch(err) {
+    document.getElementById('mainPanel').insertAdjacentHTML('beforeend', `
+      <div class="banner banner-err">❌ ${err.message}</div>`);
+    document.getElementById('runBtn').disabled = false;
+  }
+}
+</script>
+</body>
+</html>
