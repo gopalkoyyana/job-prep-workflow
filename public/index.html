@@ -217,7 +217,7 @@ function setStep(n, status) {
   if (status === 'active') el.querySelector('.step-num').textContent = n;
 }
 
-let state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobDuration:'', jobsList:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
+let state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobDuration:'', jobsList:[], selectedJobIds:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
 
 function resetAll() {
   for (let i = 1; i <= 5; i++) {
@@ -232,7 +232,7 @@ function resetAll() {
       <p>Enter a job role and email. The Node.js server handles all Claude/Gemini/OpenAI API calls securely.</p>
     </div>`;
   document.getElementById('runBtn').disabled = false;
-  state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobDuration:'', jobsList:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
+  state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobDuration:'', jobsList:[], selectedJobIds:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
 }
 
 function addCard(id, icon, title, bodyHTML) {
@@ -275,6 +275,7 @@ async function step1() {
     duration: state.jobDuration
   });
   state.jobsList = jobs;
+  state.selectedJobIds = [];
 
   if (!jobs || jobs.length === 0) {
     setCardBody('c1', `<div class="banner banner-err">❌ No job postings found. Try adjusting role, country, or duration filters.</div>`);
@@ -282,13 +283,13 @@ async function step1() {
     return;
   }
 
-  let html = `<div class="banner banner-info">ℹ️ Found ${jobs.length} postings. Select one to proceed with your prep plan.</div>`;
+  let html = `<div class="banner banner-info" id="selectionCount">ℹ️ Found ${jobs.length} postings. Select one or more to proceed.</div>`;
   html += `<div style="display:flex; flex-direction:column; gap:16px; margin-top:12px;">`;
   
   jobs.forEach((job) => {
     const reqs = (job.requirements || []).map(r => `<li>${r}</li>`).join('');
     html += `
-      <div class="job-detail" style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:16px; text-align:left;">
+      <div class="job-detail" id="job-card-${job.id}" style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:16px; text-align:left; transition: border-color 0.2s;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
           <h4 style="font-size:15px; color:var(--text); font-weight:700;">${job.title}</h4>
           <span style="font-size:11px; font-weight:700; background:rgba(79, 142, 247, 0.15); color:var(--accent); padding:3px 8px; border-radius:12px;">${job.portal}</span>
@@ -303,35 +304,55 @@ async function step1() {
         <p style="margin-top:10px; font-size:13px; color:var(--subtle); line-height:1.6;">${job.description}</p>
         <h4 style="margin-top:12px; font-size:13px; color:var(--text);">Key Requirements</h4>
         <ul style="padding-left:18px; margin-top:6px; font-size:12px; color:var(--subtle);">${reqs}</ul>
-        <button class="btn btn-primary" style="margin-top:14px; width:auto; padding:8px 16px; font-size:12px;" onclick="selectJob(${job.id})">🎯 Select This Job</button>
+        <button class="btn btn-secondary" id="select-btn-${job.id}" style="margin-top:14px; width:auto; padding:8px 16px; font-size:12px;" onclick="toggleJobSelection(${job.id})">➕ Select Job</button>
       </div>
     `;
   });
   
   html += `</div>`;
+  html += `
+    <div style="margin-top:20px; display:flex; justify-content:flex-end;">
+      <button class="btn btn-primary" id="proceedBtn" style="width:auto;" onclick="proceedWithSelection()" disabled>🎯 Proceed with Selected Jobs (0)</button>
+    </div>
+  `;
   setCardBody('c1', html);
 }
 
-async function selectJob(jobId) {
-  const selected = state.jobsList.find(j => j.id === jobId);
-  if (!selected) return;
-  state.jobData = selected;
+function toggleJobSelection(jobId) {
+  const idx = state.selectedJobIds.indexOf(jobId);
+  const btn = document.getElementById('select-btn-' + jobId);
+  const card = document.getElementById('job-card-' + jobId);
   
-  const reqs = (selected.requirements || []).map(r => `<li>${r}</li>`).join('');
-  setCardBody('c1', `
-    <div class="banner banner-ok">✅ Selected: ${selected.title} at ${selected.company}</div>
-    <div class="job-detail">
-      <h4>${selected.title}</h4>
-      <div class="job-meta">
-        <span>🏢 ${selected.company}</span><span>📍 ${selected.location}</span>
-        <span>⏱ ${selected.experience}</span><span>💰 ${selected.salary}</span>
+  if (idx === -1) {
+    state.selectedJobIds.push(jobId);
+    btn.textContent = '❌ Deselect';
+    btn.className = 'btn btn-primary';
+    card.style.borderColor = 'var(--accent)';
+  } else {
+    state.selectedJobIds.splice(idx, 1);
+    btn.textContent = '➕ Select Job';
+    btn.className = 'btn btn-secondary';
+    card.style.borderColor = 'var(--border)';
+  }
+  
+  const proceedBtn = document.getElementById('proceedBtn');
+  proceedBtn.textContent = `🎯 Proceed with Selected Jobs (${state.selectedJobIds.length})`;
+  proceedBtn.disabled = state.selectedJobIds.length === 0;
+}
+
+async function proceedWithSelection() {
+  const selectedJobs = state.jobsList.filter(j => state.selectedJobIds.includes(j.id));
+  state.jobData = selectedJobs;
+  
+  let selectedSummary = `<div class="banner banner-ok">✅ Selected ${selectedJobs.length} job(s) for preparation</div>`;
+  selectedJobs.forEach(job => {
+    selectedSummary += `
+      <div style="font-size:13px; margin-top:8px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+        <strong>${job.title}</strong> at <em>${job.company}</em> (${job.location})
       </div>
-      <div class="divider"></div>
-      <p style="margin-top:10px;">${selected.description}</p>
-      <h4 style="margin-top:12px;">Key Requirements</h4>
-      <ul style="padding-left:18px;margin-top:6px;">${reqs}</ul>
-    </div>`);
-  
+    `;
+  });
+  setCardBody('c1', selectedSummary);
   setStep(1, 'done');
   
   try {
@@ -343,7 +364,7 @@ async function selectJob(jobId) {
     const main = document.getElementById('mainPanel');
     main.insertAdjacentHTML('beforeend', `
       <div class="banner banner-ok" style="margin-top:4px;">
-        🎉 All done, ${state.userName||'champion'}! Your 2-day prep plan is ready. Good luck!
+        🎉 All done, ${state.userName||'champion'}! Your prep plan is ready. Good luck!
       </div>`);
     main.scrollTop = main.scrollHeight;
   } catch (err) {
