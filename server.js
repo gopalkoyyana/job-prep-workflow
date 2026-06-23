@@ -170,11 +170,19 @@ async function callLLM({ prompt, system = '', useWebSearch = false }) {
 // ── Helper: parse JSON safely ───────────────────────────────────
 function parseJSON(raw) {
   const clean = raw.replace(/```json|```/g, '').trim();
-  const obj   = clean.match(/\{[\s\S]*\}/);
-  const arr   = clean.match(/\[[\s\S]*\]/);
-  if (obj) return JSON.parse(obj[0]);
-  if (arr) return JSON.parse(arr[0]);
-  return JSON.parse(clean);
+  try {
+    return JSON.parse(clean);
+  } catch (e) {
+    const arr = clean.match(/\[[\s\S]*\]/);
+    if (arr) {
+      try { return JSON.parse(arr[0]); } catch (_) {}
+    }
+    const obj = clean.match(/\{[\s\S]*\}/);
+    if (obj) {
+      try { return JSON.parse(obj[0]); } catch (_) {}
+    }
+    throw e;
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
