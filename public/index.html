@@ -190,11 +190,7 @@
 </div>
 
 <script>
-// ── Config: backend URL (same origin since Express serves this file) ──
-const API_BASE = '';   // empty = same host; set to 'http://localhost:3000' if running separately
-
-let state = { jobRole:'', userName:'', userEmail:'', jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
-
+const API_BASE = '';
 // ── Health check on load ─────────────────────────────────────────
 async function checkHealth() {
   try {
