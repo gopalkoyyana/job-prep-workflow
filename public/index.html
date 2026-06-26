@@ -222,6 +222,16 @@ checkHealth();
 
 // ── Helpers ──────────────────────────────────────────────────────
 function setStep(n, status) {
+  const el = document.getElementById('step' + n);
+  if (!el) return;
+  el.className = 'step ' + status;
+  if (status === 'active') {
+    el.querySelector('.step-num').textContent = '⟳';
+  } else if (status === 'done') {
+    el.querySelector('.step-num').textContent = '✓';
+  }
+}
+
 let state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobDuration:'', resumeText:'', jobsList:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
 
 function resetAll() {
