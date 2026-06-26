@@ -173,14 +173,34 @@ function parseJSON(raw) {
   try {
     return JSON.parse(clean);
   } catch (e) {
+    console.warn('⚠️ JSON.parse failed on clean string, attempting substring extraction. Raw response was:');
+    console.warn(raw);
+    console.warn('Error was:', e.message);
+
     const arr = clean.match(/\[[\s\S]*\]/);
     if (arr) {
-      try { return JSON.parse(arr[0]); } catch (_) {}
+      try { 
+        return JSON.parse(arr[0]); 
+      } catch (innerErr) {
+        console.error('Failed to parse extracted JSON array:', innerErr.message);
+      }
     }
     const obj = clean.match(/\{[\s\S]*\}/);
     if (obj) {
-      try { return JSON.parse(obj[0]); } catch (_) {}
+      try { 
+        return JSON.parse(obj[0]); 
+      } catch (innerErr) {
+        console.error('Failed to parse extracted JSON object:', innerErr.message);
+      }
     }
+    
+    // If it looks like a conversational "no results/jobs found" response, return an empty array to prevent crash
+    const lowerClean = clean.toLowerCase();
+    if (lowerClean.includes('no job') || lowerClean.includes('not find') || lowerClean.includes('cannot find') || lowerClean.includes('could not find') || lowerClean.includes('unable to find') || lowerClean.includes('no postings')) {
+      console.log('🔍 Detected "no jobs found" conversational response, returning empty array.');
+      return [];
+    }
+    
     throw e;
   }
 }
@@ -205,9 +225,9 @@ app.post('/api/job', async (req, res) => {
   try {
     const raw = await callLLM({
       useWebSearch: true,
-      system: 'Return only valid JSON as a JSON array of objects. No markdown fences.',
+      system: 'You are a strict JSON generator. You must return only a valid JSON array. Never include any conversational preamble, explanation, or markdown formatting (do not wrap in ```json). If no jobs are found, return an empty array: []',
       prompt: `Search for all current real job postings for "${jobRole}" ${countryQuery} ${durationQuery} from LinkedIn, Indeed, Naukri, or any top job portal. Do not limit the results; list all matching postings found.
-Return a JSON array of objects ONLY, formatted exactly like this:
+Return a JSON array of objects ONLY (no explanations, no markdown fences), formatted exactly like this:
 [
   {
     "id": 1,
@@ -221,7 +241,9 @@ Return a JSON array of objects ONLY, formatted exactly like this:
     "requirements": ["req1","req2","...up to 8"]
   },
   ...
-]`,
+]
+
+If no matching jobs are found, return exactly: []`,
     });
 
     const jobs = parseJSON(raw);
