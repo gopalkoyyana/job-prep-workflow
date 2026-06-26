@@ -165,6 +165,16 @@
     </div>
 
     <div>
+      <div class="section-label">Your Resume (Optional)</div>
+      <div class="input-group">
+        <label>Upload .txt Resume</label>
+        <input id="resumeFile" type="file" accept=".txt" onchange="loadResumeFile(event)"/>
+        <label>Or Paste Resume Text</label>
+        <textarea id="resumeText" rows="4" placeholder="Paste resume to analyze ATS keyword match and tailor..."></textarea>
+      </div>
+    </div>
+
+    <div>
       <div class="section-label">Workflow Progress</div>
       <div class="steps">
         <div class="step" id="step1"><div class="step-num">1</div>Fetch Job Posting</div>
@@ -172,6 +182,7 @@
         <div class="step" id="step3"><div class="step-num">3</div>Find YouTube Resources</div>
         <div class="step" id="step4"><div class="step-num">4</div>Generate 2-Day Plan</div>
         <div class="step" id="step5"><div class="step-num">5</div>Draft & Send Email</div>
+        <div class="step" id="step6" style="display: none;"><div class="step-num">6</div>Tailor ATS Resume</div>
       </div>
     </div>
 
@@ -211,20 +222,15 @@ checkHealth();
 
 // ── Helpers ──────────────────────────────────────────────────────
 function setStep(n, status) {
-  const el = document.getElementById('step' + n);
-  el.className = 'step ' + status;
-  if (status === 'done') el.querySelector('.step-num').textContent = '✓';
-  if (status === 'active') el.querySelector('.step-num').textContent = n;
-}
-
-let state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobDuration:'', jobsList:[], selectedJobIds:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
+let state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobDuration:'', resumeText:'', jobsList:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
 
 function resetAll() {
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 1; i <= 6; i++) {
     const el = document.getElementById('step' + i);
     el.className = 'step';
     el.querySelector('.step-num').textContent = i;
   }
+  document.getElementById('step6').style.display = 'none';
   document.getElementById('mainPanel').innerHTML = `
     <div class="empty" id="emptyState">
       <div class="empty-icon">🔍</div>
@@ -232,7 +238,7 @@ function resetAll() {
       <p>Enter a job role and email. The Node.js server handles all Claude/Gemini/OpenAI API calls securely.</p>
     </div>`;
   document.getElementById('runBtn').disabled = false;
-  state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobDuration:'', jobsList:[], selectedJobIds:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
+  state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobDuration:'', resumeText:'', jobsList:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
 }
 
 function addCard(id, icon, title, bodyHTML) {
@@ -245,6 +251,17 @@ function addCard(id, icon, title, bodyHTML) {
       <div class="card-body">${bodyHTML}</div>
     </div>`);
   main.scrollTop = main.scrollHeight;
+}
+
+function removeCardsFromStep(stepNum) {
+  for (let i = stepNum; i <= 6; i++) {
+    document.getElementById('c' + i)?.remove();
+    const el = document.getElementById('step' + i);
+    if (el) {
+      el.className = 'step';
+      el.querySelector('.step-num').textContent = i;
+    }
+  }
 }
 
 function setCardBody(id, html) {
@@ -263,6 +280,18 @@ async function apiPost(path, body) {
   return d.data;
 }
 
+function loadResumeFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    document.getElementById('resumeText').value = evt.target.result;
+  };
+  reader.readAsText(file);
+}
+
+let originalJobsListHTML = '';
+
 // ── Step 1 ───────────────────────────────────────────────────────
 async function step1() {
   setStep(1, 'active');
@@ -275,7 +304,6 @@ async function step1() {
     duration: state.jobDuration
   });
   state.jobsList = jobs;
-  state.selectedJobIds = [];
 
   if (!jobs || jobs.length === 0) {
     setCardBody('c1', `<div class="banner banner-err">❌ No job postings found. Try adjusting role, country, or duration filters.</div>`);
@@ -283,13 +311,13 @@ async function step1() {
     return;
   }
 
-  let html = `<div class="banner banner-info" id="selectionCount">ℹ️ Found ${jobs.length} postings. Select one or more to proceed.</div>`;
+  let html = `<div class="banner banner-info">ℹ️ Found ${jobs.length} postings. Select one to proceed with your prep plan.</div>`;
   html += `<div style="display:flex; flex-direction:column; gap:16px; margin-top:12px;">`;
   
   jobs.forEach((job) => {
     const reqs = (job.requirements || []).map(r => `<li>${r}</li>`).join('');
     html += `
-      <div class="job-detail" id="job-card-${job.id}" style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:16px; text-align:left; transition: border-color 0.2s;">
+      <div class="job-detail" style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:16px; text-align:left;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
           <h4 style="font-size:15px; color:var(--text); font-weight:700;">${job.title}</h4>
           <span style="font-size:11px; font-weight:700; background:rgba(79, 142, 247, 0.15); color:var(--accent); padding:3px 8px; border-radius:12px;">${job.portal}</span>
@@ -304,55 +332,42 @@ async function step1() {
         <p style="margin-top:10px; font-size:13px; color:var(--subtle); line-height:1.6;">${job.description}</p>
         <h4 style="margin-top:12px; font-size:13px; color:var(--text);">Key Requirements</h4>
         <ul style="padding-left:18px; margin-top:6px; font-size:12px; color:var(--subtle);">${reqs}</ul>
-        <button class="btn btn-secondary" id="select-btn-${job.id}" style="margin-top:14px; width:auto; padding:8px 16px; font-size:12px;" onclick="toggleJobSelection(${job.id})">➕ Select Job</button>
+        <button class="btn btn-primary" style="margin-top:14px; width:auto; padding:8px 16px; font-size:12px;" onclick="selectJob(${job.id})">🎯 Prepare For This Job</button>
       </div>
     `;
   });
   
   html += `</div>`;
-  html += `
-    <div style="margin-top:20px; display:flex; justify-content:flex-end;">
-      <button class="btn btn-primary" id="proceedBtn" style="width:auto;" onclick="proceedWithSelection()" disabled>🎯 Proceed with Selected Jobs (0)</button>
-    </div>
-  `;
+  originalJobsListHTML = html;
   setCardBody('c1', html);
 }
 
-function toggleJobSelection(jobId) {
-  const idx = state.selectedJobIds.indexOf(jobId);
-  const btn = document.getElementById('select-btn-' + jobId);
-  const card = document.getElementById('job-card-' + jobId);
+async function selectJob(jobId) {
+  const selected = state.jobsList.find(j => j.id === jobId);
+  if (!selected) return;
+  state.jobData = selected;
   
-  if (idx === -1) {
-    state.selectedJobIds.push(jobId);
-    btn.textContent = '❌ Deselect';
-    btn.className = 'btn btn-primary';
-    card.style.borderColor = 'var(--accent)';
-  } else {
-    state.selectedJobIds.splice(idx, 1);
-    btn.textContent = '➕ Select Job';
-    btn.className = 'btn btn-secondary';
-    card.style.borderColor = 'var(--border)';
-  }
-  
-  const proceedBtn = document.getElementById('proceedBtn');
-  proceedBtn.textContent = `🎯 Proceed with Selected Jobs (${state.selectedJobIds.length})`;
-  proceedBtn.disabled = state.selectedJobIds.length === 0;
-}
+  // Clean up any subsequent steps from a previous runs
+  removeCardsFromStep(2);
 
-async function proceedWithSelection() {
-  const selectedJobs = state.jobsList.filter(j => state.selectedJobIds.includes(j.id));
-  state.jobData = selectedJobs;
-  
-  let selectedSummary = `<div class="banner banner-ok">✅ Selected ${selectedJobs.length} job(s) for preparation</div>`;
-  selectedJobs.forEach(job => {
-    selectedSummary += `
-      <div style="font-size:13px; margin-top:8px; border-bottom:1px solid var(--border); padding-bottom:8px;">
-        <strong>${job.title}</strong> at <em>${job.company}</em> (${job.location})
+  const reqs = (selected.requirements || []).map(r => `<li>${r}</li>`).join('');
+  setCardBody('c1', `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+      <div class="banner banner-ok" style="margin-bottom:0; flex:1;">✅ Selected: ${selected.title} at ${selected.company}</div>
+      <button class="btn btn-secondary" style="width:auto; padding:6px 12px; font-size:12px;" onclick="backToJobList()">⬅️ Back to Job List</button>
+    </div>
+    <div class="job-detail">
+      <h4>${selected.title}</h4>
+      <div class="job-meta">
+        <span>🏢 ${selected.company}</span><span>📍 ${selected.location}</span>
+        <span>⏱ ${selected.experience}</span><span>💰 ${selected.salary}</span>
       </div>
-    `;
-  });
-  setCardBody('c1', selectedSummary);
+      <div class="divider"></div>
+      <p style="margin-top:10px;">${selected.description}</p>
+      <h4 style="margin-top:12px;">Key Requirements</h4>
+      <ul style="padding-left:18px;margin-top:6px;">${reqs}</ul>
+    </div>`);
+  
   setStep(1, 'done');
   
   try {
@@ -360,10 +375,13 @@ async function proceedWithSelection() {
     await step3();
     await step4();
     await step5();
+    if (state.resumeText) {
+      await step6();
+    }
     
     const main = document.getElementById('mainPanel');
     main.insertAdjacentHTML('beforeend', `
-      <div class="banner banner-ok" style="margin-top:4px;">
+      <div class="banner banner-ok" style="margin-top:4px;" id="successSummaryBanner">
         🎉 All done, ${state.userName||'champion'}! Your prep plan is ready. Good luck!
       </div>`);
     main.scrollTop = main.scrollHeight;
@@ -372,6 +390,20 @@ async function proceedWithSelection() {
       <div class="banner banner-err">❌ ${err.message}</div>`);
     document.getElementById('runBtn').disabled = false;
   }
+}
+
+function backToJobList() {
+  // Revert UI to job selection state
+  state.jobData = null;
+  state.skills = [];
+  state.ytResources = [];
+  state.plan = null;
+  state.emailDraft = null;
+
+  removeCardsFromStep(2);
+  document.getElementById('successSummaryBanner')?.remove();
+  setStep(1, 'active');
+  setCardBody('c1', originalJobsListHTML);
 }
 
 // ── Step 2 ───────────────────────────────────────────────────────
@@ -503,6 +535,30 @@ function copyEmailHTML() {
   });
 }
 
+// ── Step 6 ───────────────────────────────────────────────────────
+async function step6() {
+  setStep(6, 'active');
+  addCard('c6','📄','Step 6 — ATS Resume Tailoring',
+    `<div class="loading"><div class="spinner"></div>Tailoring resume for role with keywords…</div>`);
+
+  const resData = await apiPost('/api/resume', { 
+    resumeText: state.resumeText,
+    jobData: state.jobData,
+    skills: state.skills
+  });
+
+  const improvementsHtml = (resData.improvements || []).map(i => `<li>${i}</li>`).join('');
+  setCardBody('c6', `
+    <div class="banner banner-ok">✅ Resume Tailored for ATS Screeners</div>
+    <h4 style="margin-bottom:8px;">Suggested Improvements & Gap Analysis:</h4>
+    <ul style="padding-left:18px; margin-bottom:14px; font-size:12px; line-height:1.5; color:var(--subtle);">${improvementsHtml}</ul>
+    <h4 style="margin-bottom:6px;">Updated Resume (Markdown):</h4>
+    <textarea style="width:100%; height:250px; font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--surface2); color:var(--text); padding:10px; border-radius:8px; border:1px solid var(--border);" readonly>${resData.modifiedResume}</textarea>
+    <button class="btn btn-primary" style="margin-top:10px; width:auto; padding:8px 16px; font-size:12px;" onclick="navigator.clipboard.writeText(\`${resData.modifiedResume.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">📋 Copy Tailored Resume</button>
+  `);
+  setStep(6, 'done');
+}
+
 // ── Orchestrator ─────────────────────────────────────────────────
 async function runWorkflow() {
   state.jobRole   = document.getElementById('jobRole').value.trim();
@@ -510,11 +566,18 @@ async function runWorkflow() {
   state.userEmail = document.getElementById('userEmail').value.trim();
   state.jobCountry = document.getElementById('jobCountry').value.trim();
   state.jobDuration = document.getElementById('jobDuration').value;
+  state.resumeText = document.getElementById('resumeText').value.trim();
 
   if (!state.jobRole)   return alert('Please enter a job role.');
   if (!state.userEmail) return alert('Please enter your email address.');
 
   document.getElementById('runBtn').disabled = true;
+
+  if (state.resumeText) {
+    document.getElementById('step6').style.display = 'flex';
+  } else {
+    document.getElementById('step6').style.display = 'none';
+  }
 
   try {
     await step1();

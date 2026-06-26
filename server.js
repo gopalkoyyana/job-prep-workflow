@@ -239,15 +239,14 @@ app.post('/api/skills', async (req, res) => {
   const { jobData } = req.body;
   if (!jobData) return res.status(400).json({ error: 'jobData is required' });
 
-  const jobsArray = Array.isArray(jobData) ? jobData : [jobData];
-  const titles = jobsArray.map(j => j.title).join(', ');
-  const descriptions = jobsArray.map(j => `Title: ${j.title}\nCompany: ${j.company}\nDescription: ${j.description}\nRequirements: ${(j.requirements || []).join(', ')}`).join('\n\n');
+  const job = Array.isArray(jobData) ? jobData[0] : jobData;
 
   try {
     const raw = await callLLM({
       system: 'Return only a valid JSON array of skill strings. No markdown.',
-      prompt: `From these job descriptions and requirements for roles: "${titles}", extract the most important combined technical and soft skills.
-Job Details:\n${descriptions}
+      prompt: `From this job description and requirements for "${job.title}", extract the most important technical and soft skills.
+Job Description: ${job.description}
+Requirements: ${(job.requirements || []).join(', ')}
 Return ONLY a JSON array of 8–12 skill keyword strings. Example: ["React","TypeScript","Jest"]`,
     });
 
@@ -299,13 +298,12 @@ app.post('/api/plan', async (req, res) => {
   const { jobData, skills, ytResources } = req.body;
   if (!jobData || !skills) return res.status(400).json({ error: 'jobData and skills are required' });
 
-  const jobsArray = Array.isArray(jobData) ? jobData : [jobData];
-  const targetRoles = jobsArray.map(j => `"${j.title}" at ${j.company}`).join(' and ');
+  const job = Array.isArray(jobData) ? jobData[0] : jobData;
 
   try {
     const raw = await callLLM({
       system: 'Return only valid JSON. No markdown, no extra text.',
-      prompt: `Create a detailed 2-day interview preparation plan targeting the following roles: ${targetRoles}.
+      prompt: `Create a detailed 2-day interview preparation plan for "${job.title}" at ${job.company}.
 Skills to cover: ${skills.join(', ')}
 ${ytResources && ytResources.length ? `Here are some curated YouTube learning resources for these skills:
 ${ytResources.map(r => `- ${r.skill}: "${r.title}" (${r.url})`).join('\n')}
@@ -334,10 +332,9 @@ app.post('/api/email', async (req, res) => {
   const { userName, userEmail, jobData, skills, ytResources, plan } = req.body;
   if (!userEmail || !jobData) return res.status(400).json({ error: 'userEmail and jobData are required' });
 
-  const jobsArray = Array.isArray(jobData) ? jobData : [jobData];
-  const targetRoles = jobsArray.map(j => `"${j.title}" at ${j.company}`).join(' and ');
+  const job = Array.isArray(jobData) ? jobData[0] : jobData;
 
-  // 1. Generate email content with Claude
+  // 1. Generate email content with LLM
   const ytList     = (ytResources || []).map(r => `• ${r.skill}: "${r.title}" by ${r.channel} (${r.duration}) — ${r.url}`).join('\n');
   const day1Blocks = (plan?.day1?.blocks || []).map(b => `  ${b.time}: ${b.title} — ${b.desc}`).join('\n');
   const day2Blocks = (plan?.day2?.blocks || []).map(b => `  ${b.time}: ${b.title} — ${b.desc}`).join('\n');
@@ -347,8 +344,8 @@ app.post('/api/email', async (req, res) => {
     const raw = await callLLM({
       system: 'Return only valid JSON with subject and html fields. No markdown.',
       prompt: `Write a detailed, professional, motivating preparation plan email for ${userName || 'the candidate'} 
-preparing for these job roles: ${targetRoles}.
-Include: warm opening, overview of target jobs, key skills (${skills.join(', ')}),
+preparing for ${job.title} at ${job.company}.
+Include: warm opening, job overview, key skills (${skills.join(', ')}),
 YouTube resources:\n${ytList}
 Day 1 plan (${plan?.day1?.theme}):\n${day1Blocks}
 Day 2 plan (${plan?.day2?.theme}):\n${day2Blocks}
@@ -401,6 +398,44 @@ Return JSON: { "subject": "...", "html": "...full HTML email..." }`,
     sendError,
     data: emailData,
   });
+});
+
+// ════════════════════════════════════════════════════════════════
+//  ROUTE 7 — ATS Resume Tailoring (Optional)
+// ════════════════════════════════════════════════════════════════
+app.post('/api/resume', async (req, res) => {
+  const { resumeText, jobData, skills } = req.body;
+  if (!resumeText || !jobData || !skills) {
+    return res.status(400).json({ error: 'resumeText, jobData, and skills are required' });
+  }
+
+  const job = Array.isArray(jobData) ? jobData[0] : jobData;
+
+  try {
+    const raw = await callLLM({
+      system: 'Return only valid JSON with modifiedResume and improvements fields. No markdown fences.',
+      prompt: `Analyze this resume and integrate the key skills for the target role to pass ATS screening.
+Target Job: "${job.title}" at ${job.company}
+Skills to naturally integrate: ${skills.join(', ')}
+
+Resume:
+${resumeText}
+
+Return a JSON object only:
+{
+  "modifiedResume": "The complete modified resume in markdown format, with the new skills highlighted or integrated seamlessly",
+  "improvements": [
+    "A list of specific suggestions or gap analysis (3-5 points)"
+  ]
+}`,
+    });
+
+    const result = parseJSON(raw);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    console.error('[/api/resume]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ════════════════════════════════════════════════════════════════
