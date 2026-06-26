@@ -206,7 +206,7 @@ app.post('/api/job', async (req, res) => {
     const raw = await callLLM({
       useWebSearch: true,
       system: 'Return only valid JSON as a JSON array of objects. No markdown fences.',
-      prompt: `Search for 3 to 5 current real job postings for "${jobRole}" ${countryQuery} ${durationQuery} from LinkedIn, Indeed, Naukri, or any top job portal.
+      prompt: `Search for all current real job postings for "${jobRole}" ${countryQuery} ${durationQuery} from LinkedIn, Indeed, Naukri, or any top job portal. Do not limit the results; list all matching postings found.
 Return a JSON array of objects ONLY, formatted exactly like this:
 [
   {
