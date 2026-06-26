@@ -4,8 +4,10 @@ Secure Express server that proxies all API calls so your credentials **never tou
 
 ## Key Features
 - **Flexible LLM Backend**: Use Anthropic Claude, Google Gemini, or OpenAI GPT-4o.
-- **Advanced Job Filtering**: Filter job listings by duration/recency (e.g. 24 hours, 2 days, 7 days) and placement country.
-- **Multiple Postings & Selection**: Displays 3-5 current job postings matching the criteria and allows you to select one to build the plan against.
+- **Advanced Job Filtering**: Filter job listings by duration/recency (e.g. 24 hours, 2 days, 7 days, all matching postings) and placement country.
+- **Single Job Selection**: Displays all matching job postings in the specified period and allows you to select one specific job position to build the preparation plan against.
+- **Back to Job List**: Easy navigation to go back to the matching job list and prepare for a different position without querying from scratch.
+- **Optional ATS Resume Tailoring**: Upload a `.txt` resume or paste resume text to automatically analyze, adapt, and highlight key target skills to pass ATS screening.
 - **YouTube Resources in Schedule**: Integrates relevant tutorials directly into your 2-day study blocks.
 
 ## Project Structure
@@ -66,6 +68,7 @@ http://localhost:3000
 | POST | `/api/skills` | Extract skill keywords from the selected job posting |
 | POST | `/api/youtube` | Find short YouTube learning resources for extracted skills |
 | POST | `/api/plan` | Generate 2-day prep plan incorporating curated video URLs |
+| POST | `/api/resume` | Analyze and tailor resume with target skills to pass ATS screening |
 | POST | `/api/email` | Generate + send plan email via Gmail SMTP |
 
 ---
@@ -85,4 +88,3 @@ http://localhost:3000
 - ✅ Browser never sees your private API credentials
 - ✅ Add `.env` to `.gitignore` before pushing to GitHub
 - ✅ Set `ALLOWED_ORIGIN` to your domain in production (not `*`)
-
