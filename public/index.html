@@ -495,8 +495,183 @@ async function step4() {
       <div class="day-card"><div class="day-h1">📘 Day 1 — ${p.day1.theme}</div><div class="day-body">${blocks(p.day1.blocks)}</div></div>
       <div class="day-card"><div class="day-h2">📗 Day 2 — ${p.day2.theme}</div><div class="day-body">${blocks(p.day2.blocks)}</div></div>
     </div>
-    ${tips?`<div class="tips-box"><div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:8px;">💡 PRO TIPS</div>${tips}</div>`:''}`);
+    ${tips?`<div class="tips-box"><div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:8px;">💡 PRO TIPS</div>${tips}</div>`:''}
+    <div style="margin-top:20px; border-top:1px dashed var(--border); padding-top:16px;">
+      <h4 style="font-size:14px; margin-bottom:8px;">🚀 Level Up Your Prep</h4>
+      <button class="btn btn-primary" style="width:auto; display:inline-flex;" onclick="startMockInterview()">🎙️ Start Mock Interview for Day 1 Skills</button>
+      <div id="mockInterviewWorkspace" style="margin-top:16px; display:none; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:16px;"></div>
+    </div>`);
   setStep(4, 'done');
+}
+
+// ── Step 4 Extension: Mock Interview Logic ─────────────────────────
+let interviewQuestions = [];
+let currentQuestionIndex = 0;
+let userAnswers = [];
+let speechRecognizer = null;
+
+async function startMockInterview() {
+  const container = document.getElementById('mockInterviewWorkspace');
+  container.style.display = 'block';
+  container.innerHTML = `<div class="loading"><div class="spinner"></div>Generating 5 tailored interview questions based on the job role and Day 1 skills...</div>`;
+  
+  try {
+    interviewQuestions = await apiPost('/api/interview/start', {
+      jobData: state.jobData,
+      skills: state.skills
+    });
+    currentQuestionIndex = 0;
+    userAnswers = [];
+    showQuestion();
+  } catch (e) {
+    container.innerHTML = `<div class="banner banner-err">❌ Error generating questions: ${e.message}</div>`;
+  }
+}
+
+function showQuestion() {
+  const container = document.getElementById('mockInterviewWorkspace');
+  const q = interviewQuestions[currentQuestionIndex];
+  
+  container.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <span style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase;">Question ${currentQuestionIndex + 1} of 5</span>
+      <span style="font-size:11px; color:var(--muted);">${Math.round((currentQuestionIndex)/5*100)}% Complete</span>
+    </div>
+    <h4 style="font-size:14px; line-height:1.4; color:var(--text); margin-bottom:12px;">${q}</h4>
+    
+    <div style="position:relative; margin-bottom:14px;">
+      <textarea id="mockAnswerText" rows="4" style="width:100%;" placeholder="Type your answer here or click the mic to speak..."></textarea>
+      <button onclick="toggleSpeech()" id="micBtn" style="position:absolute; bottom:12px; right:12px; background:rgba(79, 142, 247, 0.1); border:1px solid rgba(79, 142, 247, 0.3); color:var(--accent); border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer;">🎙️</button>
+    </div>
+    
+    <div style="display:flex; gap:10px; justify-content:flex-end;">
+      ${currentQuestionIndex > 0 ? `<button class="btn btn-secondary" style="width:auto;" onclick="prevQuestion()">Previous</button>` : ''}
+      <button class="btn btn-primary" style="width:auto;" onclick="nextQuestion()">${currentQuestionIndex === 4 ? 'Finish & Evaluate' : 'Next Question'}</button>
+    </div>
+  `;
+}
+
+function toggleSpeech() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert("Speech Recognition not supported in this browser. Please use Chrome or Safari.");
+    return;
+  }
+  
+  const micBtn = document.getElementById('micBtn');
+  if (speechRecognizer) {
+    speechRecognizer.stop();
+    return;
+  }
+  
+  speechRecognizer = new SpeechRecognition();
+  speechRecognizer.continuous = true;
+  speechRecognizer.interimResults = false;
+  speechRecognizer.lang = 'en-US';
+  
+  speechRecognizer.onstart = () => {
+    micBtn.style.background = 'var(--red)';
+    micBtn.style.color = '#fff';
+    micBtn.innerText = '⏹️';
+  };
+  
+  speechRecognizer.onend = () => {
+    micBtn.style.background = 'rgba(79, 142, 247, 0.1)';
+    micBtn.style.color = 'var(--accent)';
+    micBtn.innerText = '🎙️';
+    speechRecognizer = null;
+  };
+  
+  speechRecognizer.onresult = (event) => {
+    const text = event.results[event.results.length - 1][0].transcript;
+    const txtArea = document.getElementById('mockAnswerText');
+    txtArea.value = (txtArea.value + ' ' + text).trim();
+  };
+  
+  speechRecognizer.start();
+}
+
+function prevQuestion() {
+  const ans = document.getElementById('mockAnswerText').value.trim();
+  userAnswers[currentQuestionIndex] = ans;
+  currentQuestionIndex--;
+  showQuestion();
+  document.getElementById('mockAnswerText').value = userAnswers[currentQuestionIndex] || '';
+}
+
+async function nextQuestion() {
+  const ans = document.getElementById('mockAnswerText').value.trim();
+  userAnswers[currentQuestionIndex] = ans;
+  
+  if (currentQuestionIndex < 4) {
+    currentQuestionIndex++;
+    showQuestion();
+    document.getElementById('mockAnswerText').value = userAnswers[currentQuestionIndex] || '';
+  } else {
+    evaluateInterview();
+  }
+}
+
+async function evaluateInterview() {
+  const container = document.getElementById('mockInterviewWorkspace');
+  container.innerHTML = `<div class="loading"><div class="spinner"></div>Evaluating your answers and generating scorecard...</div>`;
+  
+  const qaList = interviewQuestions.map((q, i) => ({
+    question: q,
+    answer: userAnswers[i] || 'No answer provided.'
+  }));
+  
+  try {
+    const feedback = await apiPost('/api/interview/evaluate', {
+      jobData: state.jobData,
+      qaList
+    });
+    
+    let strengthsHtml = (feedback.strengths || []).map(s => `<li>🟢 ${s}</li>`).join('');
+    let weaknessesHtml = (feedback.weaknesses || []).map(w => `<li>🔴 ${w}</li>`).join('');
+    
+    let qaFeedbackHtml = (feedback.questionFeedback || []).map((qf, i) => `
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px; margin-top:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h5 style="font-size:13px; color:var(--text);">${i+1}. ${qf.question}</h5>
+          <span style="font-size:11px; font-weight:700; background:rgba(79, 142, 247, 0.15); color:var(--accent); padding:2px 8px; border-radius:8px;">Score: ${qf.score}/100</span>
+        </div>
+        <p style="font-size:12px; margin-top:8px; color:var(--subtle);"><strong>Your Answer:</strong> ${userAnswers[i] || '<i>No answer provided.</i>'}</p>
+        <p style="font-size:12px; margin-top:6px; color:var(--green);"><strong>Ideal Points:</strong> ${qf.idealAnswer}</p>
+        <p style="font-size:12px; margin-top:6px; color:var(--yellow);"><strong>Critique:</strong> ${qf.critique}</p>
+      </div>
+    `).join('');
+
+    container.innerHTML = `
+      <div style="text-align:center; margin-bottom:18px;">
+        <h4 style="font-size:16px; margin-bottom:6px;">Interview Performance Scorecard</h4>
+        <div style="display:inline-flex; align-items:center; justify-content:center; width:72px; height:72px; border-radius:50%; background:linear-gradient(135deg, var(--accent), var(--accent2)); color:#fff; font-size:24px; font-weight:700; box-shadow:0 4px 12px rgba(79,142,247,0.3); margin:10px 0;">
+          ${feedback.overallScore}%
+        </div>
+        <p style="font-size:12px; color:var(--muted); line-height:1.5; margin-top:8px; max-width:500px; margin-left:auto; margin-right:auto;">
+          ${feedback.feedback}
+        </p>
+      </div>
+      
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+        <div style="background:rgba(34, 197, 94, 0.05); border:1px solid rgba(34, 197, 94, 0.15); border-radius:8px; padding:12px;">
+          <h5 style="font-size:12px; color:var(--green); margin-bottom:6px; font-weight:700;">STRENGTHS</h5>
+          <ul style="list-style:none; font-size:11px; color:var(--subtle); line-height:1.6;">${strengthsHtml}</ul>
+        </div>
+        <div style="background:rgba(239, 68, 68, 0.05); border:1px solid rgba(239, 68, 68, 0.15); border-radius:8px; padding:12px;">
+          <h5 style="font-size:12px; color:var(--red); margin-bottom:6px; font-weight:700;">WEAKNESSES / GAPS</h5>
+          <ul style="list-style:none; font-size:11px; color:var(--subtle); line-height:1.6;">${weaknessesHtml}</ul>
+        </div>
+      </div>
+      
+      <h4 style="font-size:13px; margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:6px;">Detailed Question Breakdown</h4>
+      ${qaFeedbackHtml}
+      
+      <button class="btn btn-secondary" style="margin-top:14px; width:auto;" onclick="startMockInterview()">↺ Retake Interview</button>
+    `;
+  } catch (e) {
+    container.innerHTML = `<div class="banner banner-err">❌ Error evaluating interview: ${e.message}</div>`;
+  }
 }
 
 // ── Step 5 ───────────────────────────────────────────────────────
@@ -545,10 +720,61 @@ function copyEmailHTML() {
   });
 }
 
-// ── Step 6 ───────────────────────────────────────────────────────
+// ── Step 6: Advanced Side-by-Side Resume Editor ──────────────────
+function renderMarkdownToHTML(md) {
+  if (!md) return '';
+  return md
+    .replace(/^# (.*$)/gim, '<h1 style="font-size: 20px; font-weight: 700; color: #111a35; border-bottom: 2px solid #4f8ef7; padding-bottom: 4px; margin-top: 14px; margin-bottom: 8px; text-align: center;">$1</h1>')
+    .replace(/^## (.*$)/gim, '<h2 style="font-size: 14px; font-weight: 600; color: #111a35; margin-top: 12px; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px;">$1</h2>')
+    .replace(/^### (.*$)/gim, '<h3 style="font-size: 12px; font-weight: 600; color: #111a35; margin-top: 8px; margin-bottom: 2px;">$1</h3>')
+    .replace(/^\* (.*$)/gim, '<li style="margin-left: 14px; margin-bottom: 3px; font-size: 11px;">$1</li>')
+    .replace(/^- (.*$)/gim, '<li style="margin-left: 14px; margin-bottom: 3px; font-size: 11px;">$1</li>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong style="color: #111a35;">$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br/>');
+}
+
+function updateResumePreview() {
+  const md = document.getElementById('atsResumeMarkdown').value;
+  document.getElementById('atsResumePreview').innerHTML = renderMarkdownToHTML(md);
+}
+
+function printResume() {
+  const content = document.getElementById('atsResumePreview').innerHTML;
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <html>
+      <head>
+        <title>Tailored ATS Resume</title>
+        <style>
+          body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; line-height: 1.4; font-size: 13px; }
+          h1 { text-align: center; font-size: 22px; color: #111a35; margin-bottom: 10px; }
+          h2 { font-size: 15px; border-bottom: 1px solid #ccc; padding-bottom: 3px; text-transform: uppercase; margin-top: 20px; color: #111a35; }
+          h3 { font-size: 13px; margin-top: 10px; margin-bottom: 4px; }
+          ul { margin: 5px 0; padding-left: 20px; }
+          li { margin-bottom: 4px; }
+          @media print {
+            body { padding: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        ${content}
+        <script>
+          window.onload = function() {
+            window.print();
+            window.close();
+          };
+        <\/script>
+      </body>
+    </html>
+  `);
+  win.document.close();
+}
+
 async function step6() {
   setStep(6, 'active');
-  addCard('c6','📄','Step 6 — ATS Resume Tailoring',
+  addCard('c6','📄','Step 6 — ATS Resume Tailoring Workspace',
     `<div class="loading"><div class="spinner"></div>Tailoring resume for role with keywords…</div>`);
 
   const resData = await apiPost('/api/resume', { 
@@ -558,14 +784,34 @@ async function step6() {
   });
 
   const improvementsHtml = (resData.improvements || []).map(i => `<li>${i}</li>`).join('');
+  
   setCardBody('c6', `
-    <div class="banner banner-ok">✅ Resume Tailored for ATS Screeners</div>
-    <h4 style="margin-bottom:8px;">Suggested Improvements & Gap Analysis:</h4>
-    <ul style="padding-left:18px; margin-bottom:14px; font-size:12px; line-height:1.5; color:var(--subtle);">${improvementsHtml}</ul>
-    <h4 style="margin-bottom:6px;">Updated Resume (Markdown):</h4>
-    <textarea style="width:100%; height:250px; font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--surface2); color:var(--text); padding:10px; border-radius:8px; border:1px solid var(--border);" readonly>${resData.modifiedResume}</textarea>
-    <button class="btn btn-primary" style="margin-top:10px; width:auto; padding:8px 16px; font-size:12px;" onclick="navigator.clipboard.writeText(\`${resData.modifiedResume.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">📋 Copy Tailored Resume</button>
+    <div class="banner banner-ok" style="margin-bottom: 12px;">✅ Resume Tailored for ATS Screeners</div>
+    
+    <div class="tips-box" style="margin-bottom: 16px; background: rgba(34, 197, 94, 0.05); border-color: rgba(34, 197, 94, 0.15);">
+      <div style="font-size:12px; font-weight:700; color:var(--green); margin-bottom:6px;">📈 SUGGESTED IMPROVEMENTS & GAP ANALYSIS</div>
+      <ul style="padding-left:16px; font-size:11px; color:var(--subtle); line-height:1.5;">${improvementsHtml}</ul>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px;">
+      <div>
+        <label style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase;">Edit Markdown Content</label>
+        <textarea id="atsResumeMarkdown" style="width:100%; height:450px; font-family:'JetBrains Mono',monospace; font-size:11px; background:var(--surface2); color:var(--text); padding:10px; border-radius:8px; border:1px solid var(--border); margin-top:6px; resize:none;" oninput="updateResumePreview()">${resData.modifiedResume}</textarea>
+      </div>
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <label style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; margin:0;">Live PDF Print Preview</label>
+          <button class="btn btn-primary" style="width:auto; padding:4px 10px; font-size:11px;" onclick="printResume()">🖨️ Save as PDF / Print</button>
+        </div>
+        <div id="atsResumePreview" style="background:#fff; color:#2d3748; padding:24px; border-radius:8px; height:450px; overflow-y:auto; font-family:'Inter',sans-serif; line-height:1.5; font-size:12px; border:1px solid var(--border);"></div>
+      </div>
+    </div>
+    <div style="margin-top: 14px;">
+      <button class="btn btn-secondary" style="width:auto; display:inline-flex;" onclick="navigator.clipboard.writeText(document.getElementById('atsResumeMarkdown').value)">📋 Copy Raw Markdown</button>
+    </div>
   `);
+  
+  updateResumePreview();
   setStep(6, 'done');
 }
 
@@ -597,6 +843,34 @@ async function runWorkflow() {
     document.getElementById('runBtn').disabled = false;
   }
 }
+
+// ── Scraper on-load checker ──────────────────────────────────────
+async function checkScrapedJob() {
+  const params = new URLSearchParams(window.location.search);
+  const scrapeId = params.get('scrapeId');
+  if (scrapeId) {
+    try {
+      document.getElementById('serverBadge').textContent = '⏳ Loading Scraped Job...';
+      const res = await fetch(`${API_BASE}/api/scrape/${scrapeId}`);
+      const d = await res.json();
+      if (d.success && d.data) {
+        const job = d.data;
+        document.getElementById('jobRole').value = job.title;
+        document.getElementById('jobCountry').value = job.location || '';
+        
+        state.jobRole = job.title;
+        state.jobCountry = job.location || '';
+        state.jobsList = [ { ...job, id: 9999 } ];
+        
+        selectJob(9999);
+      }
+    } catch (e) {
+      console.error('Failed to load scraped job:', e);
+    }
+  }
+}
+
+checkHealth().then(checkScrapedJob);
 </script>
 </body>
 </html>

@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Job Prep Intelligence Assistant",
+  "version": "1.0",
+  "description": "Scrapes job details directly from LinkedIn, Indeed, and Naukri to generate your AI preparation plan.",
+  "permissions": [
+    "activeTab",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "*://*.linkedin.com/*",
+    "*://*.indeed.com/*",
+    "*://*.naukri.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.linkedin.com/jobs/*",
+        "*://*.indeed.com/*",
+        "*://*.naukri.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

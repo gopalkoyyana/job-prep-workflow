@@ -461,6 +461,105 @@ Return a JSON object only:
 });
 
 // ════════════════════════════════════════════════════════════════
+//  ROUTES 8 & 9 — Chrome Extension Job Scraper Storage
+// ════════════════════════════════════════════════════════════════
+const scrapedJobs = new Map();
+
+app.post('/api/scrape', (req, res) => {
+  const id = Math.random().toString(36).substring(2, 11);
+  scrapedJobs.set(id, req.body);
+  res.json({ success: true, id });
+});
+
+app.get('/api/scrape/:id', (req, res) => {
+  const job = scrapedJobs.get(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Scraped job details not found' });
+  res.json({ success: true, data: job });
+});
+
+// ════════════════════════════════════════════════════════════════
+//  ROUTE 10 — Step 4 Extension: Generate Mock Interview Questions
+// ════════════════════════════════════════════════════════════════
+app.post('/api/interview/start', async (req, res) => {
+  const { jobData, skills } = req.body;
+  if (!jobData || !skills) {
+    return res.status(400).json({ error: 'jobData and skills are required' });
+  }
+
+  const job = Array.isArray(jobData) ? jobData[0] : jobData;
+
+  try {
+    const raw = await callLLM({
+      system: 'You are a strict JSON generator. Return only a JSON array of strings containing exactly 5 interview questions. No markdown fences, no conversational text.',
+      prompt: `Create 5 highly relevant technical and behavioral interview questions for the position of "${job.title}" at ${job.company}.
+The questions should test the candidate on the following key skills: ${skills.join(', ')}.
+Job description: ${job.description}
+
+Return a JSON array of strings ONLY. For example:
+[
+  "Question 1 text...",
+  "Question 2 text...",
+  "Question 3 text...",
+  "Question 4 text...",
+  "Question 5 text..."
+]`,
+    });
+
+    const questions = parseJSON(raw);
+    res.json({ success: true, data: questions });
+  } catch (err) {
+    console.error('[/api/interview/start]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════
+//  ROUTE 11 — Step 4 Extension: Evaluate Mock Interview
+// ════════════════════════════════════════════════════════════════
+app.post('/api/interview/evaluate', async (req, res) => {
+  const { jobData, qaList } = req.body;
+  if (!jobData || !qaList) {
+    return res.status(400).json({ error: 'jobData and qaList are required' });
+  }
+
+  const job = Array.isArray(jobData) ? jobData[0] : jobData;
+
+  try {
+    const raw = await callLLM({
+      system: 'You are a strict JSON generator. Return only a valid JSON object matching the requested schema. No markdown fences.',
+      prompt: `Evaluate this mock interview for the role of "${job.title}" at ${job.company}.
+Questions and Answers:
+${qaList.map((qa, i) => `${i+1}. Q: ${qa.question}\n   A: ${qa.answer}`).join('\n\n')}
+
+Compare their responses to what an ideal candidate would answer. Grade their performance.
+Return a JSON object ONLY with this exact structure:
+{
+  "overallScore": 85,
+  "feedback": "Overall high-level feedback summarizing their performance, presence, and skill gaps...",
+  "strengths": ["Strength point 1", "Strength point 2", "Strength point 3"],
+  "weaknesses": ["Weakness/Gap point 1", "Weakness/Gap point 2", "Weakness/Gap point 3"],
+  "questionFeedback": [
+    {
+      "question": "The original question",
+      "score": 80,
+      "idealAnswer": "What key concepts, details, or technologies the ideal answer should have mentioned...",
+      "critique": "A constructive evaluation of the candidate's answer..."
+    }
+  ]
+}
+
+Ensure the output is valid, parsable JSON.`,
+    });
+
+    const evaluation = parseJSON(raw);
+    res.json({ success: true, data: evaluation });
+  } catch (err) {
+    console.error('[/api/interview/evaluate]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════
 //  Start server
 // ════════════════════════════════════════════════════════════════
 app.listen(PORT, () => {
