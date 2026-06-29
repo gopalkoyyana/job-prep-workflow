@@ -227,10 +227,46 @@ app.post('/api/job', async (req, res) => {
   const durationQuery = duration ? `posted in the ${duration}` : '';
 
   try {
-    const raw = await callLLM({
-      useWebSearch: true,
-      system: 'You are a strict JSON generator. You must return only a valid JSON array. Never include any conversational preamble, explanation, or markdown formatting (do not wrap in ```json). If no jobs are found, return an empty array: []',
-      prompt: `Search for all current real job postings for "${jobRole}" ${locationQuery} ${durationQuery} from LinkedIn, Indeed, Naukri, or any top job portal. Do not limit the results; list all matching postings found.
+    const activeProvider = process.env.LLM_PROVIDER || 'anthropic';
+    let raw;
+
+    if (activeProvider === 'gemini') {
+      // Step 1: Plain text search to trigger Google Search grounding (JSON mode blocks grounding metadata)
+      const textSummary = await callLLM({
+        useWebSearch: true,
+        prompt: `Search for all current real job postings for "${jobRole}" ${locationQuery} ${durationQuery} from LinkedIn, Indeed, Naukri, or any top job portal. Describe them in detail including Title, Company, Location, Salary, Experience, Description, and Key Requirements.`
+      });
+
+      // Step 2: Format plain text search results into the required JSON schema
+      raw = await callLLM({
+        useWebSearch: false,
+        system: 'You are a strict JSON generator. You must return only a valid JSON array. Never include any conversational preamble, explanation, or markdown formatting (do not wrap in ```json). If no jobs are found, return an empty array: []',
+        prompt: `Format the following job listings into a valid JSON array of objects. Format exactly like this:
+[
+  {
+    "id": 1,
+    "title": "exact job title",
+    "company": "company name",
+    "portal": "portal name",
+    "location": "city, country",
+    "experience": "years required",
+    "salary": "salary range",
+    "description": "full job description (200-300 words)",
+    "requirements": ["req1","req2","...up to 8"]
+  },
+  ...
+]
+
+If no jobs are listed or found in the text, return exactly: []
+
+Job listings text:
+${textSummary}`
+      });
+    } else {
+      raw = await callLLM({
+        useWebSearch: true,
+        system: 'You are a strict JSON generator. You must return only a valid JSON array. Never include any conversational preamble, explanation, or markdown formatting (do not wrap in ```json). If no jobs are found, return an empty array: []',
+        prompt: `Search for all current real job postings for "${jobRole}" ${locationQuery} ${durationQuery} from LinkedIn, Indeed, Naukri, or any top job portal. Do not limit the results; list all matching postings found.
 Return a JSON array of objects ONLY (no explanations, no markdown fences), formatted exactly like this:
 [
   {
@@ -248,7 +284,8 @@ Return a JSON array of objects ONLY (no explanations, no markdown fences), forma
 ]
 
 If no matching jobs are found, return exactly: []`,
-    });
+      });
+    }
 
     const jobs = parseJSON(raw);
     res.json({ success: true, data: jobs });
