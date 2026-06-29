@@ -142,6 +142,8 @@
         <input id="jobRole" type="text" placeholder="e.g. Senior React Native Developer"/>
         <label>Country of Placement</label>
         <input id="jobCountry" type="text" placeholder="e.g. United States, India, Remote" value="United States"/>
+        <label>City (Optional)</label>
+        <input id="jobCity" type="text" placeholder="e.g. New York, Bangalore"/>
         <label>Job Posting Recency (Duration)</label>
         <select id="jobDuration" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 13px;font-size:13px;outline:none;margin-top:6px;">
           <option value="last 24 hours">Last 24 Hours</option>
@@ -232,7 +234,7 @@ function setStep(n, status) {
   }
 }
 
-let state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobDuration:'', resumeText:'', jobsList:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
+let state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobCity:'', jobDuration:'', resumeText:'', jobsList:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
 
 function resetAll() {
   for (let i = 1; i <= 6; i++) {
@@ -248,7 +250,7 @@ function resetAll() {
       <p>Enter a job role and email. The Node.js server handles all Claude/Gemini/OpenAI API calls securely.</p>
     </div>`;
   document.getElementById('runBtn').disabled = false;
-  state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobDuration:'', resumeText:'', jobsList:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
+  state = { jobRole:'', userName:'', userEmail:'', jobCountry:'', jobCity:'', jobDuration:'', resumeText:'', jobsList:[], jobData:null, skills:[], ytResources:[], plan:null, emailDraft:null };
 }
 
 function addCard(id, icon, title, bodyHTML) {
@@ -311,6 +313,7 @@ async function step1() {
   const jobs = await apiPost('/api/job', { 
     jobRole: state.jobRole,
     country: state.jobCountry,
+    city: state.jobCity,
     duration: state.jobDuration
   });
   state.jobsList = jobs;
@@ -821,6 +824,7 @@ async function runWorkflow() {
   state.userName  = document.getElementById('userName').value.trim();
   state.userEmail = document.getElementById('userEmail').value.trim();
   state.jobCountry = document.getElementById('jobCountry').value.trim();
+  state.jobCity = document.getElementById('jobCity').value.trim();
   state.jobDuration = document.getElementById('jobDuration').value;
   state.resumeText = document.getElementById('resumeText').value.trim();
 

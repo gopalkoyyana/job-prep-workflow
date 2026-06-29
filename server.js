@@ -216,17 +216,21 @@ app.get('/api/health', (req, res) => {
 //  ROUTE 2 — Step 1: Fetch job postings
 // ════════════════════════════════════════════════════════════════
 app.post('/api/job', async (req, res) => {
-  const { jobRole, country, duration } = req.body;
+  const { jobRole, country, city, duration } = req.body;
   if (!jobRole) return res.status(400).json({ error: 'jobRole is required' });
 
-  const countryQuery = country ? `in ${country}` : '';
+  const locationParts = [];
+  if (city) locationParts.push(city);
+  if (country) locationParts.push(country);
+
+  const locationQuery = locationParts.length ? `in ${locationParts.join(', ')}` : '';
   const durationQuery = duration ? `posted in the ${duration}` : '';
 
   try {
     const raw = await callLLM({
       useWebSearch: true,
       system: 'You are a strict JSON generator. You must return only a valid JSON array. Never include any conversational preamble, explanation, or markdown formatting (do not wrap in ```json). If no jobs are found, return an empty array: []',
-      prompt: `Search for all current real job postings for "${jobRole}" ${countryQuery} ${durationQuery} from LinkedIn, Indeed, Naukri, or any top job portal. Do not limit the results; list all matching postings found.
+      prompt: `Search for all current real job postings for "${jobRole}" ${locationQuery} ${durationQuery} from LinkedIn, Indeed, Naukri, or any top job portal. Do not limit the results; list all matching postings found.
 Return a JSON array of objects ONLY (no explanations, no markdown fences), formatted exactly like this:
 [
   {
