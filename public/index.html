@@ -139,13 +139,13 @@
       <div class="section-label">Target Job</div>
       <div class="input-group">
         <label>Job Role / Position Title</label>
-        <input id="jobRole" type="text" placeholder="e.g. Senior React Native Developer"/>
+        <input id="jobRole" type="text" placeholder="e.g. Senior React Native Developer" oninput="saveInputs()"/>
         <label>Country of Placement</label>
-        <input id="jobCountry" type="text" placeholder="e.g. United States, India, Remote" value="United States"/>
+        <input id="jobCountry" type="text" placeholder="e.g. United States, India, Remote" value="United States" oninput="saveInputs()"/>
         <label>City (Optional)</label>
-        <input id="jobCity" type="text" placeholder="e.g. New York, Bangalore"/>
+        <input id="jobCity" type="text" placeholder="e.g. New York, Bangalore" oninput="saveInputs()"/>
         <label>Job Posting Recency (Duration)</label>
-        <select id="jobDuration" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 13px;font-size:13px;outline:none;margin-top:6px;">
+        <select id="jobDuration" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 13px;font-size:13px;outline:none;margin-top:6px;" onchange="saveInputs()">
           <option value="last 24 hours">Last 24 Hours</option>
           <option value="last 2 days">Last 2 Days</option>
           <option value="last 7 days" selected>Last 7 Days</option>
@@ -159,9 +159,9 @@
       <div class="section-label">Your Details</div>
       <div class="input-group">
         <label>Your Name</label>
-        <input id="userName" type="text" placeholder="e.g. Gopal"/>
+        <input id="userName" type="text" placeholder="e.g. Gopal" oninput="saveInputs()"/>
         <label>Email Address</label>
-        <input id="userEmail" type="email" placeholder="your@email.com"/>
+        <input id="userEmail" type="email" placeholder="your@email.com" oninput="saveInputs()"/>
         <p class="note">📧 Email will be sent automatically via your configured SMTP</p>
       </div>
     </div>
@@ -172,7 +172,7 @@
         <label>Upload .txt Resume</label>
         <input id="resumeFile" type="file" accept=".txt" onchange="loadResumeFile(event)"/>
         <label>Or Paste Resume Text</label>
-        <textarea id="resumeText" rows="4" placeholder="Paste resume to analyze ATS keyword match and tailor..."></textarea>
+        <textarea id="resumeText" rows="4" placeholder="Paste resume to analyze ATS keyword match and tailor..." oninput="saveInputs()"></textarea>
       </div>
     </div>
 
@@ -366,19 +366,23 @@ async function step1() {
   addCard('c1','🌐','Step 1 — Fetching Job Postings',
     `<div class="loading"><div class="spinner"></div>Searching job portals for <strong>${state.jobRole}</strong>…</div>`);
 
-  const jobs = await apiPost('/api/job', { 
-    jobRole: state.jobRole,
-    country: state.jobCountry,
-    city: state.jobCity,
-    duration: state.jobDuration
-  });
-  state.jobsList = jobs;
+  try {
+    const jobs = await apiPost('/api/job', { 
+      jobRole: state.jobRole,
+      country: state.jobCountry,
+      city: state.jobCity,
+      duration: state.jobDuration
+    });
+    state.jobsList = jobs;
 
-  if (!jobs || jobs.length === 0) {
-    setCardBody('c1', `<div class="banner banner-err">❌ No job postings found. Try adjusting role, country, or duration filters.</div>`);
-    document.getElementById('runBtn').disabled = false;
-    return;
-  }
+    if (!jobs || jobs.length === 0) {
+      setCardBody('c1', `
+        <div class="banner banner-err">❌ No job postings found. Try adjusting role, country, or duration filters.</div>
+        <button class="btn btn-secondary" style="width:auto; margin-top:8px;" onclick="step1()">↺ Retry Search</button>
+      `);
+      document.getElementById('runBtn').disabled = false;
+      return;
+    }
 
   let html = `
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
@@ -415,6 +419,14 @@ async function step1() {
   html += `</div>`;
   originalJobsListHTML = html;
   setCardBody('c1', html);
+  } catch (err) {
+    setCardBody('c1', `
+      <div class="banner banner-err">❌ Error: ${err.message}</div>
+      <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">The AI model might be experiencing high demand. Click below to retry.</p>
+      <button class="btn btn-primary" style="width:auto; display:inline-flex; align-items:center; gap:6px;" onclick="step1()">↺ Retry Search</button>
+    `);
+    document.getElementById('runBtn').disabled = false;
+  }
 }
 
 async function selectJob(jobId) {
@@ -487,14 +499,22 @@ async function step2() {
   addCard('c2','🧠','Step 2 — Extracting Skill Keywords',
     `<div class="loading"><div class="spinner"></div>Analysing job description…</div>`);
 
-  state.skills = await apiPost('/api/skills', { jobData: state.jobData });
+  try {
+    state.skills = await apiPost('/api/skills', { jobData: state.jobData });
 
-  setCardBody('c2', `
-    <p style="font-size:13px;color:var(--subtle);margin-bottom:12px;">
-      Identified <strong style="color:var(--text)">${state.skills.length} key skills</strong>:
-    </p>
-    <div class="skill-chips">${state.skills.map(s=>`<span class="skill-chip">${s}</span>`).join('')}</div>`);
-  setStep(2, 'done');
+    setCardBody('c2', `
+      <p style="font-size:13px;color:var(--subtle);margin-bottom:12px;">
+        Identified <strong style="color:var(--text)">${state.skills.length} key skills</strong>:
+      </p>
+      <div class="skill-chips">${state.skills.map(s=>`<span class="skill-chip">${s}</span>`).join('')}</div>`);
+    setStep(2, 'done');
+  } catch (err) {
+    setCardBody('c2', `
+      <div class="banner banner-err">❌ Error: ${err.message}</div>
+      <button class="btn btn-primary" style="width:auto;" onclick="retryFromStep(2)">↺ Retry Step 2</button>
+    `);
+    throw err;
+  }
 }
 
 // ── Step 3 ───────────────────────────────────────────────────────
@@ -503,26 +523,34 @@ async function step3() {
   addCard('c3','▶️','Step 3 — YouTube Learning Resources (≤10 min each)',
     `<div class="loading"><div class="spinner"></div>Curating tutorials for each skill…</div>`);
 
-  state.ytResources = await apiPost('/api/youtube', { skills: state.skills });
+  try {
+    state.ytResources = await apiPost('/api/youtube', { skills: state.skills });
 
-  const cards = state.ytResources.map(r => `
-    <div class="yt-card">
-      <div class="yt-thumb">
-        ${r.videoId
-          ? `<img src="https://img.youtube.com/vi/${r.videoId}/mqdefault.jpg" onerror="this.parentNode.innerHTML='▶️'"/>`
-          : '▶️'}
-      </div>
-      <div class="yt-info">
-        <div class="yt-skill">${r.skill}</div>
-        <div class="yt-title">${r.title}</div>
-        <div class="yt-meta"><span>📺 ${r.channel}</span><span>⏱ ${r.duration}</span><span>👁 ${r.views}</span></div>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px;">${r.reason||''}</div>
-        <a class="yt-link" href="${r.url}" target="_blank">▶ Watch on YouTube</a>
-      </div>
-    </div>`).join('');
+    const cards = state.ytResources.map(r => `
+      <div class="yt-card">
+        <div class="yt-thumb">
+          ${r.videoId
+            ? `<img src="https://img.youtube.com/vi/${r.videoId}/mqdefault.jpg" onerror="this.parentNode.innerHTML='▶️'"/>`
+            : '▶️'}
+        </div>
+        <div class="yt-info">
+          <div class="yt-skill">${r.skill}</div>
+          <div class="yt-title">${r.title}</div>
+          <div class="yt-meta"><span>📺 ${r.channel}</span><span>⏱ ${r.duration}</span><span>👁 ${r.views}</span></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">${r.reason||''}</div>
+          <a class="yt-link" href="${r.url}" target="_blank">▶ Watch on YouTube</a>
+        </div>
+      </div>`).join('');
 
-  setCardBody('c3', `<div class="yt-grid">${cards}</div>`);
-  setStep(3, 'done');
+    setCardBody('c3', `<div class="yt-grid">${cards}</div>`);
+    setStep(3, 'done');
+  } catch (err) {
+    setCardBody('c3', `
+      <div class="banner banner-err">❌ Error: ${err.message}</div>
+      <button class="btn btn-primary" style="width:auto;" onclick="retryFromStep(3)">↺ Retry Step 3</button>
+    `);
+    throw err;
+  }
 }
 
 // ── Step 4 ───────────────────────────────────────────────────────
@@ -531,42 +559,50 @@ async function step4() {
   addCard('c4','📅','Step 4 — 2-Day Preparation Plan',
     `<div class="loading"><div class="spinner"></div>Building your schedule…</div>`);
 
-  state.plan = await apiPost('/api/plan', { jobData: state.jobData, skills: state.skills, ytResources: state.ytResources });
-  const p = state.plan;
+  try {
+    state.plan = await apiPost('/api/plan', { jobData: state.jobData, skills: state.skills, ytResources: state.ytResources });
+    const p = state.plan;
 
-  function blocks(list) {
-    return (list||[]).map((b,i) => {
-      const tags = (b.skills||[]).map(s=>`<span class="skill-chip" style="font-size:10px;padding:2px 8px;">${s}</span>`).join('');
-      let resourceHtml = '';
-      if (b.resource) {
-        resourceHtml = `<div style="margin-top:6px;"><a class="yt-link" href="${b.resource}" target="_blank" style="font-size:11px; padding:3px 8px; display:inline-flex;">▶ Watch Tutorial</a></div>`;
-      }
-      return `<div class="time-block">
-        <span class="time-label">${b.time}</span>
-        <div class="time-content">
-          <div class="time-title">${b.title}</div>
-          <div class="time-desc">${b.desc}</div>
-          ${tags?`<div style="margin-top:4px;">${tags}</div>`:''}
-          ${resourceHtml}
-        </div>
-      </div>${i<list.length-1?'<div class="divider"></div>':''}`;
-    }).join('');
+    function blocks(list) {
+      return (list||[]).map((b,i) => {
+        const tags = (b.skills||[]).map(s=>`<span class="skill-chip" style="font-size:10px;padding:2px 8px;">${s}</span>`).join('');
+        let resourceHtml = '';
+        if (b.resource) {
+          resourceHtml = `<div style="margin-top:6px;"><a class="yt-link" href="${b.resource}" target="_blank" style="font-size:11px; padding:3px 8px; display:inline-flex;">▶ Watch Tutorial</a></div>`;
+        }
+        return `<div class="time-block">
+          <span class="time-label">${b.time}</span>
+          <div class="time-content">
+            <div class="time-title">${b.title}</div>
+            <div class="time-desc">${b.desc}</div>
+            ${tags?`<div style="margin-top:4px;">${tags}</div>`:''}
+            ${resourceHtml}
+          </div>
+        </div>${i<list.length-1?'<div class="divider"></div>':''}`;
+      }).join('');
+    }
+
+    const tips = (p.tips||[]).map(t=>`<div style="font-size:12px;color:var(--subtle);margin-bottom:5px;">• ${t}</div>`).join('');
+
+    setCardBody('c4', `
+      <div class="plan-grid">
+        <div class="day-card"><div class="day-h1">📘 Day 1 — ${p.day1.theme}</div><div class="day-body">${blocks(p.day1.blocks)}</div></div>
+        <div class="day-card"><div class="day-h2">📗 Day 2 — ${p.day2.theme}</div><div class="day-body">${blocks(p.day2.blocks)}</div></div>
+      </div>
+      ${tips?`<div class="tips-box"><div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:8px;">💡 PRO TIPS</div>${tips}</div>`:''}
+      <div style="margin-top:20px; border-top:1px dashed var(--border); padding-top:16px;">
+        <h4 style="font-size:14px; margin-bottom:8px;">🚀 Level Up Your Prep</h4>
+        <button class="btn btn-primary" style="width:auto; display:inline-flex;" onclick="startMockInterview()">🎙️ Start Mock Interview for Day 1 Skills</button>
+        <div id="mockInterviewWorkspace" style="margin-top:16px; display:none; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:16px;"></div>
+      </div>`);
+    setStep(4, 'done');
+  } catch (err) {
+    setCardBody('c4', `
+      <div class="banner banner-err">❌ Error: ${err.message}</div>
+      <button class="btn btn-primary" style="width:auto;" onclick="retryFromStep(4)">↺ Retry Step 4</button>
+    `);
+    throw err;
   }
-
-  const tips = (p.tips||[]).map(t=>`<div style="font-size:12px;color:var(--subtle);margin-bottom:5px;">• ${t}</div>`).join('');
-
-  setCardBody('c4', `
-    <div class="plan-grid">
-      <div class="day-card"><div class="day-h1">📘 Day 1 — ${p.day1.theme}</div><div class="day-body">${blocks(p.day1.blocks)}</div></div>
-      <div class="day-card"><div class="day-h2">📗 Day 2 — ${p.day2.theme}</div><div class="day-body">${blocks(p.day2.blocks)}</div></div>
-    </div>
-    ${tips?`<div class="tips-box"><div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:8px;">💡 PRO TIPS</div>${tips}</div>`:''}
-    <div style="margin-top:20px; border-top:1px dashed var(--border); padding-top:16px;">
-      <h4 style="font-size:14px; margin-bottom:8px;">🚀 Level Up Your Prep</h4>
-      <button class="btn btn-primary" style="width:auto; display:inline-flex;" onclick="startMockInterview()">🎙️ Start Mock Interview for Day 1 Skills</button>
-      <div id="mockInterviewWorkspace" style="margin-top:16px; display:none; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:16px;"></div>
-    </div>`);
-  setStep(4, 'done');
 }
 
 // ── Step 4 Extension: Mock Interview Logic ─────────────────────────
@@ -745,35 +781,43 @@ async function step5() {
   addCard('c5','📧','Step 5 — Drafting & Sending Email',
     `<div class="loading"><div class="spinner"></div>Generating personalised email…</div>`);
 
-  const result = await fetch(`${API_BASE}/api/email`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      userName: state.userName, userEmail: state.userEmail,
-      jobData: state.jobData, skills: state.skills,
-      ytResources: state.ytResources, plan: state.plan
-    })
-  }).then(r=>r.json());
+  try {
+    const result = await fetch(`${API_BASE}/api/email`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        userName: state.userName, userEmail: state.userEmail,
+        jobData: state.jobData, skills: state.skills,
+        ytResources: state.ytResources, plan: state.plan
+      })
+    }).then(r=>r.json());
 
-  if (result.error && !result.data) throw new Error(result.error);
-  state.emailDraft = result.data;
+    if (result.error && !result.data) throw new Error(result.error);
+    state.emailDraft = result.data;
 
-  const sentBanner = result.emailSent
-    ? `<div class="banner banner-ok">✅ Email sent to ${state.userEmail}</div>`
-    : `<div class="banner banner-warn">⚠️ ${result.sendError || 'SMTP not configured — copy HTML to send manually'}</div>`;
+    const sentBanner = result.emailSent
+      ? `<div class="banner banner-ok">✅ Email sent to ${state.userEmail}</div>`
+      : `<div class="banner banner-warn">⚠️ ${result.sendError || 'SMTP not configured — copy HTML to send manually'}</div>`;
 
-  const subj = (result.data?.subject||'').replace(/"/g,'&quot;');
-  setCardBody('c5', `
-    ${sentBanner}
-    <div style="display:flex;gap:10px;margin-bottom:13px;flex-wrap:wrap;">
-      <div style="flex:1;min-width:180px;"><label>Subject</label><input type="text" value="${subj}" readonly/></div>
-      <div style="min-width:180px;"><label>To</label><input type="text" value="${state.userEmail}" readonly/></div>
-    </div>
-    <div class="email-actions">
-      <button class="act-btn act-primary" onclick="copyEmailHTML()">📋 Copy Email HTML</button>
-      <a class="act-btn act-secondary" href="mailto:${state.userEmail}?subject=${encodeURIComponent(result.data?.subject||'')}" target="_blank">📤 Open in Mail App</a>
-    </div>
-    <div class="email-preview">${result.data?.html||''}</div>`);
-  setStep(5, 'done');
+    const subj = (result.data?.subject||'').replace(/"/g,'&quot;');
+    setCardBody('c5', `
+      ${sentBanner}
+      <div style="display:flex;gap:10px;margin-bottom:13px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:180px;"><label>Subject</label><input type="text" value="${subj}" readonly/></div>
+        <div style="min-width:180px;"><label>To</label><input type="text" value="${state.userEmail}" readonly/></div>
+      </div>
+      <div class="email-actions">
+        <button class="act-btn act-primary" onclick="copyEmailHTML()">📋 Copy Email HTML</button>
+        <a class="act-btn act-secondary" href="mailto:${state.userEmail}?subject=${encodeURIComponent(result.data?.subject||'')}" target="_blank">📤 Open in Mail App</a>
+      </div>
+      <div class="email-preview">${result.data?.html||''}</div>`);
+    setStep(5, 'done');
+  } catch (err) {
+    setCardBody('c5', `
+      <div class="banner banner-err">❌ Error: ${err.message}</div>
+      <button class="btn btn-primary" style="width:auto;" onclick="retryFromStep(5)">↺ Retry Step 5</button>
+    `);
+    throw err;
+  }
 }
 
 function copyEmailHTML() {
@@ -842,42 +886,50 @@ async function step6() {
   addCard('c6','📄','Step 6 — ATS Resume Tailoring Workspace',
     `<div class="loading"><div class="spinner"></div>Tailoring resume for role with keywords…</div>`);
 
-  const resData = await apiPost('/api/resume', { 
-    resumeText: state.resumeText,
-    jobData: state.jobData,
-    skills: state.skills
-  });
+  try {
+    const resData = await apiPost('/api/resume', { 
+      resumeText: state.resumeText,
+      jobData: state.jobData,
+      skills: state.skills
+    });
 
-  const improvementsHtml = (resData.improvements || []).map(i => `<li>${i}</li>`).join('');
-  
-  setCardBody('c6', `
-    <div class="banner banner-ok" style="margin-bottom: 12px;">✅ Resume Tailored for ATS Screeners</div>
+    const improvementsHtml = (resData.improvements || []).map(i => `<li>${i}</li>`).join('');
     
-    <div class="tips-box" style="margin-bottom: 16px; background: rgba(34, 197, 94, 0.05); border-color: rgba(34, 197, 94, 0.15);">
-      <div style="font-size:12px; font-weight:700; color:var(--green); margin-bottom:6px;">📈 SUGGESTED IMPROVEMENTS & GAP ANALYSIS</div>
-      <ul style="padding-left:16px; font-size:11px; color:var(--subtle); line-height:1.5;">${improvementsHtml}</ul>
-    </div>
-    
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px;">
-      <div>
-        <label style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase;">Edit Markdown Content</label>
-        <textarea id="atsResumeMarkdown" style="width:100%; height:450px; font-family:'JetBrains Mono',monospace; font-size:11px; background:var(--surface2); color:var(--text); padding:10px; border-radius:8px; border:1px solid var(--border); margin-top:6px; resize:none;" oninput="updateResumePreview()">${resData.modifiedResume}</textarea>
+    setCardBody('c6', `
+      <div class="banner banner-ok" style="margin-bottom: 12px;">✅ Resume Tailored for ATS Screeners</div>
+      
+      <div class="tips-box" style="margin-bottom: 16px; background: rgba(34, 197, 94, 0.05); border-color: rgba(34, 197, 94, 0.15);">
+        <div style="font-size:12px; font-weight:700; color:var(--green); margin-bottom:6px;">📈 SUGGESTED IMPROVEMENTS & GAP ANALYSIS</div>
+        <ul style="padding-left:16px; font-size:11px; color:var(--subtle); line-height:1.5;">${improvementsHtml}</ul>
       </div>
-      <div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <label style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; margin:0;">Live PDF Print Preview</label>
-          <button class="btn btn-primary" style="width:auto; padding:4px 10px; font-size:11px;" onclick="printResume()">🖨️ Save as PDF / Print</button>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px;">
+        <div>
+          <label style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase;">Edit Markdown Content</label>
+          <textarea id="atsResumeMarkdown" style="width:100%; height:450px; font-family:'JetBrains Mono',monospace; font-size:11px; background:var(--surface2); color:var(--text); padding:10px; border-radius:8px; border:1px solid var(--border); margin-top:6px; resize:none;" oninput="updateResumePreview()">${resData.modifiedResume}</textarea>
         </div>
-        <div id="atsResumePreview" style="background:#fff; color:#2d3748; padding:24px; border-radius:8px; height:450px; overflow-y:auto; font-family:'Inter',sans-serif; line-height:1.5; font-size:12px; border:1px solid var(--border);"></div>
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <label style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; margin:0;">Live PDF Print Preview</label>
+            <button class="btn btn-primary" style="width:auto; padding:4px 10px; font-size:11px;" onclick="printResume()">🖨️ Save as PDF / Print</button>
+          </div>
+          <div id="atsResumePreview" style="background:#fff; color:#2d3748; padding:24px; border-radius:8px; height:450px; overflow-y:auto; font-family:'Inter',sans-serif; line-height:1.5; font-size:12px; border:1px solid var(--border);"></div>
+        </div>
       </div>
-    </div>
-    <div style="margin-top: 14px;">
-      <button class="btn btn-secondary" style="width:auto; display:inline-flex;" onclick="navigator.clipboard.writeText(document.getElementById('atsResumeMarkdown').value)">📋 Copy Raw Markdown</button>
-    </div>
-  `);
-  
-  updateResumePreview();
-  setStep(6, 'done');
+      <div style="margin-top: 14px;">
+        <button class="btn btn-secondary" style="width:auto; display:inline-flex;" onclick="navigator.clipboard.writeText(document.getElementById('atsResumeMarkdown').value)">📋 Copy Raw Markdown</button>
+      </div>
+    `);
+    
+    updateResumePreview();
+    setStep(6, 'done');
+  } catch (err) {
+    setCardBody('c6', `
+      <div class="banner banner-err">❌ Error: ${err.message}</div>
+      <button class="btn btn-primary" style="width:auto;" onclick="retryFromStep(6)">↺ Retry Step 6</button>
+    `);
+    throw err;
+  }
 }
 
 // ── Orchestrator ─────────────────────────────────────────────────
@@ -904,10 +956,67 @@ async function runWorkflow() {
   try {
     await step1();
   } catch(err) {
-    document.getElementById('mainPanel').insertAdjacentHTML('beforeend', `
-      <div class="banner banner-err">❌ ${err.message}</div>`);
+    // Already handled inside step1
+  }
+}
+
+async function retryFromStep(stepNum) {
+  document.getElementById('successSummaryBanner')?.remove();
+  removeCardsFromStep(stepNum);
+  
+  try {
+    if (stepNum === 2) {
+      await step2();
+      await step3();
+      await step4();
+      await step5();
+      if (state.resumeText) await step6();
+    } else if (stepNum === 3) {
+      await step3();
+      await step4();
+      await step5();
+      if (state.resumeText) await step6();
+    } else if (stepNum === 4) {
+      await step4();
+      await step5();
+      if (state.resumeText) await step6();
+    } else if (stepNum === 5) {
+      await step5();
+      if (state.resumeText) await step6();
+    } else if (stepNum === 6) {
+      await step6();
+    }
+    
+    const main = document.getElementById('mainPanel');
+    main.insertAdjacentHTML('beforeend', `
+      <div class="banner banner-ok" style="margin-top:4px;" id="successSummaryBanner">
+        🎉 All done, ${state.userName||'champion'}! Your prep plan is ready. Good luck!
+      </div>`);
+    main.scrollTop = main.scrollHeight;
+  } catch (err) {
     document.getElementById('runBtn').disabled = false;
   }
+}
+
+// ── Form Cache (localStorage) Helpers ─────────────────────────────
+function saveInputs() {
+  localStorage.setItem('jobRole', document.getElementById('jobRole').value);
+  localStorage.setItem('jobCountry', document.getElementById('jobCountry').value);
+  localStorage.setItem('jobCity', document.getElementById('jobCity').value);
+  localStorage.setItem('jobDuration', document.getElementById('jobDuration').value);
+  localStorage.setItem('userName', document.getElementById('userName').value);
+  localStorage.setItem('userEmail', document.getElementById('userEmail').value);
+  localStorage.setItem('resumeText', document.getElementById('resumeText').value);
+}
+
+function loadInputs() {
+  if (localStorage.getItem('jobRole')) document.getElementById('jobRole').value = localStorage.getItem('jobRole');
+  if (localStorage.getItem('jobCountry')) document.getElementById('jobCountry').value = localStorage.getItem('jobCountry');
+  if (localStorage.getItem('jobCity')) document.getElementById('jobCity').value = localStorage.getItem('jobCity');
+  if (localStorage.getItem('jobDuration')) document.getElementById('jobDuration').value = localStorage.getItem('jobDuration');
+  if (localStorage.getItem('userName')) document.getElementById('userName').value = localStorage.getItem('userName');
+  if (localStorage.getItem('userEmail')) document.getElementById('userEmail').value = localStorage.getItem('userEmail');
+  if (localStorage.getItem('resumeText')) document.getElementById('resumeText').value = localStorage.getItem('resumeText');
 }
 
 // ── Scraper on-load checker ──────────────────────────────────────
@@ -936,6 +1045,8 @@ async function checkScrapedJob() {
   }
 }
 
+// Initialize
+loadInputs();
 checkHealth().then(checkScrapedJob);
 </script>
 </body>
