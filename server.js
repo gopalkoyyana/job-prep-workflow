@@ -234,7 +234,7 @@ app.post('/api/job', async (req, res) => {
       // Step 1: Plain text search to trigger Google Search grounding (JSON mode blocks grounding metadata)
       const textSummary = await callLLM({
         useWebSearch: true,
-        prompt: `Search for all current real job postings for "${jobRole}" ${locationQuery} ${durationQuery} from LinkedIn, Indeed, Naukri, or any top job portal. Describe them in detail including Title, Company, Location, Salary, Experience, Description, and Key Requirements.`
+        prompt: `Search for all current real job postings for "${jobRole}" ${locationQuery} ${durationQuery} from LinkedIn, Indeed, Naukri, Foundit, or other top job portals. Describe them in detail including Title, Company, Location, Salary, Experience, Description, Key Requirements, and the exact source URL of the job posting.`
       });
 
       // Step 2: Format plain text search results into the required JSON schema
@@ -247,12 +247,13 @@ app.post('/api/job', async (req, res) => {
     "id": 1,
     "title": "exact job title",
     "company": "company name",
-    "portal": "portal name",
+    "portal": "portal name (e.g. LinkedIn, Indeed, Naukri, Foundit)",
     "location": "city, country",
     "experience": "years required",
     "salary": "salary range",
     "description": "full job description (200-300 words)",
-    "requirements": ["req1","req2","...up to 8"]
+    "requirements": ["req1","req2","...up to 8"],
+    "url": "exact source URL of the job posting"
   },
   ...
 ]
@@ -266,19 +267,20 @@ ${textSummary}`
       raw = await callLLM({
         useWebSearch: true,
         system: 'You are a strict JSON generator. You must return only a valid JSON array. Never include any conversational preamble, explanation, or markdown formatting (do not wrap in ```json). If no jobs are found, return an empty array: []',
-        prompt: `Search for all current real job postings for "${jobRole}" ${locationQuery} ${durationQuery} from LinkedIn, Indeed, Naukri, or any top job portal. Do not limit the results; list all matching postings found.
+        prompt: `Search for all current real job postings for "${jobRole}" ${locationQuery} ${durationQuery} from LinkedIn, Indeed, Naukri, Foundit, or other top job portals. Do not limit the results; list all matching postings found.
 Return a JSON array of objects ONLY (no explanations, no markdown fences), formatted exactly like this:
 [
   {
     "id": 1,
     "title": "exact job title",
     "company": "company name",
-    "portal": "portal name",
+    "portal": "portal name (e.g. LinkedIn, Indeed, Naukri, Foundit)",
     "location": "city, country",
     "experience": "years required",
     "salary": "salary range",
     "description": "full job description (200-300 words)",
-    "requirements": ["req1","req2","...up to 8"]
+    "requirements": ["req1","req2","...up to 8"],
+    "url": "exact source URL of the job posting"
   },
   ...
 ]
